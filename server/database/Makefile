@@ -1,21 +1,15 @@
-CC = g++
+CC = gcc
 
 CFLAGS = -Wall
 DBFLAGS = -l sqlite3
 
-CLIENT_DIR = ./client
-SERVER_DIR = ./server
-
-IP_SERVER = 192.168.1.5
-
-
 all: clean test.out run_test
 
 test.out: 
-	${CC} ${CFLAGS} test.cpp -o test.out ${DBFLAGS}
+	${CC} ${CFLAGS} testDB.c -o testDB.out ${DBFLAGS}
 
 run_test: 
-	./test.out
+	./testDB.out
 
 clean: 
 	rm -f *.db *.out all
