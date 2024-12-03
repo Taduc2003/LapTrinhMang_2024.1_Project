@@ -1,15 +1,15 @@
 #pragma once
 #include <stdio.h>
-#include <string.h>
 #include <sqlite3.h>
+#include <string.h>
+#include <stdlib.h>
 
-#define DATABASE_FILE "database.db"
+#define DATABASE_FILE "./server/database/database.db"
 
 sqlite3 *db;
 
 void open_database()
 {
-
     if (sqlite3_open(DATABASE_FILE, &db) != SQLITE_OK)
     {
         fprintf(stderr, "Error: Can't open database: %s\n", sqlite3_errmsg(db));
@@ -21,20 +21,6 @@ void open_database()
 void close_database()
 {
     sqlite3_close(db);
-}
-
-static int callback(void *data, int argc, char **argv, char **azColName)
-{
-    int i;
-    fprintf(stderr, "%s: ", (const char *)data);
-
-    for (i = 0; i < argc; i++)
-    {
-        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-    }
-
-    printf("\n");
-    return 0;
 }
 
 void create_account_table()
@@ -55,33 +41,32 @@ void create_account_table()
     }
 }
 
-int search_account_table(const char *username)
+int search_account_table(char *username)
 {
     open_database();
-
+    int check = 0;
     const char *select_query = "SELECT * FROM accounts WHERE username = ?;";
     sqlite3_stmt *stmt;
-
     if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
     {
         sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
-
         while (sqlite3_step(stmt) == SQLITE_ROW)
         {
-            if (SQLITE_ROW == 0)
-                return 2;
-            int id = sqlite3_column_int(stmt, 0);
-            const char *retrievedUsername = (const char *)sqlite3_column_text(stmt, 1);
-            const char *retrievedPassword = (const char *)sqlite3_column_text(stmt, 2);
+            check = 1;
+            // int id = sqlite3_column_int(stmt, 0); // Removed unused variable
+            // const char *retrievedUsername = (const char *)sqlite3_column_text(stmt, 1); // Removed unused variable
+            // const char *retrievedPassword = (const char *)sqlite3_column_text(stmt, 2); // Removed unused variable
 
-            printf("Account found:\n");
-            printf("ID: %d\n", id);
-            printf("Username: %s\n", retrievedUsername);
-            printf("Password: %s\n", retrievedPassword);
+            // printf("Account found:\n");
+            // printf("ID: %d\n", id);
+            // printf("Username: %s\n", retrievedUsername);
+            // printf("Password: %s\n", retrievedPassword);
         }
 
         sqlite3_finalize(stmt);
-        return 0;
+        if (check == 1)
+            return 0;
+        return 2;
     }
     else
     {
@@ -91,20 +76,20 @@ int search_account_table(const char *username)
 
     close_database();
     // return state
-    // 0 = success
+    // 0 = found
     // 1 = fail
     // 2 = not found
 }
 
-int insert_account_table(const char *username, const char *password)
+int insert_account_table(char *username, char *password)
 {
 
     open_database();
     int check_username_exist = search_account_table(username);
 
-    if (check_username_exist == 2)
+    if (check_username_exist == 0)
     {
-        fprintf(stderr, "Username has existed");
+        fprintf(stderr, "Username has existed Cannot Add\n");
         return 1;
     }
     const char *insert_query = "INSERT INTO accounts (username, password) VALUES (?, ?);";
@@ -136,4 +121,51 @@ int insert_account_table(const char *username, const char *password)
     // 0 = success
     // 1 = fail, account exists
     // 2 = fail
+}
+
+int check_login(char *username, char *password)
+{
+    open_database();
+
+    int check = -1;
+    const char *select_query = "SELECT * FROM accounts WHERE username = ?;";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+        while (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            check = 1;
+            // int id = sqlite3_column_int(stmt, 0); // Removed unused variable
+            // const char *retrievedUsername = (const char *)sqlite3_column_text(stmt, 1); // Removed unused variable
+            const char *retrievedPassword = (const char *)sqlite3_column_text(stmt, 2);
+
+            // printf("Account found:\n");
+            // printf("ID: %d\n", id);
+            // printf("Username: %s\n", retrievedUsername);
+            // printf("Password: %s\n", retrievedPassword);
+            check = strcmp(password, retrievedPassword);
+        }
+
+        sqlite3_finalize(stmt);
+
+        if (check == 0)
+            return 0;
+        if (check == 1)
+            return 1;
+        return 2;
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        return 3;
+    }
+
+    close_database();
+
+    // return state
+    // 0 = found & correct pwd
+    // 1 = found & wrong pwd
+    // 2 = not found
+    // 3 = err
 }
