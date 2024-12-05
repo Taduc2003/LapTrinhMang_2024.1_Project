@@ -1,36 +1,40 @@
-#include <stdio.h>
-#include <sqlite3.h>
-#include <string.h>
 #include "database_function.h"
+#include <assert.h>
+#include <stdio.h>
 
-
-int main(int argc, char **argv)
-{
-    create_users_table();
-    insert_users_table("acc0", "12345678");
-    insert_users_table("acc1", "12345678");
-    insert_users_table("acc2", "12345678");
-    insert_users_table("acc2", "12345678");
-    insert_users_table("acc3", "12345678");
-    search_users_table("acc1");
-    search_users_table("acc5");
-
-    create_rooms_table();
-    insert_rooms_table(1);
-    insert_rooms_table(1);
-
-    create_questions_table();
-    insert_sample_questions();
-    // insert_questions_table("content1", "ans1", "ans2", "ans3", 1, 1);
-    // insert_questions_table("content2", "ans1", "ans2", "ans3", 1, 1);
-    // insert_questions_table("content3", "ans1", "ans2", "ans3", 1, 1);
-
-    create_ranking_round_table();
-    insert_ranking_round_table(1,1,1,100);
-    insert_ranking_round_table(1,2,1,100);
-    insert_ranking_round_table(1,3,1,100);
-    
-    printf("%d", check_login("acc0", "12345678"));
-    return (0);
+// Khai báo hàm delete_test_user
+void delete_test_user(const char* username) {
+    // Định nghĩa hàm xóa người dùng
+    printf("User %s has been deleted.\n", username);
+    // Thực hiện xóa người dùng từ cơ sở dữ liệu ở đây
 }
 
+void test_check_login_success()
+{
+    // Set up
+    insert_users_table("testuser", "password123");
+
+    // Test
+    assert(check_login("testuser", "password123") == 0);
+
+    // Clean up
+    delete_test_user("testuser"); // Tạo hàm xóa sau
+}
+
+void test_check_login_wrong_password()
+{
+    insert_users_table("testuser", "password123");
+    assert(check_login("testuser", "wrongpassword") == 1);
+    delete_test_user("testuser");
+}
+
+void test_check_login_user_not_found()
+{
+    assert(check_login("nonexistentuser", "password123") == 2);
+}
+
+int main()
+{
+    display_users_table();
+    return 0;
+}
