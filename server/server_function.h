@@ -5,7 +5,7 @@
 #include <string.h>
 #include "./database/database_function.h"
 #include <ctype.h>
-
+#include "send_question_function.h"
 // Định nghĩa hằng số
 #define MAXLINE 4096
 
@@ -181,6 +181,9 @@ void process_message(char *msg, int n, int connfd)
     char header[MAXLINE] = {0};
     char data[MAXLINE] = {0};
 
+    static int game_requests = 0; // số lượng yêu cầu vào game
+    static int connfds[3]; // Mảng chứa các kết nối của người chơi
+
     // Tách HEADER và DATA
     char *header_start = strstr(msg, "HEADER: ");
     char *data_start = strstr(msg, "DATA: ");
@@ -243,7 +246,20 @@ void process_message(char *msg, int n, int connfd)
     {
         handle_join_room_request(data, connfd, user_id);
     }
-    
+    else if (strcmp(header, "JOIN_GAME") == 0)
+    {     
+        connfds[game_requests++] = connfd;
+        if (game_requests == 3)
+        {
+            // Đủ 3 người chơi, bắt đầu game
+            handle_game(connfds[0], connfds[1], connfds[2]);
+            game_requests = 0; // Reset số lượng yêu cầu vào game
+        }
+        else
+        {
+            send(connfd, "WAITING_FOR_PLAYERS", strlen("WAITING_FOR_PLAYERS"), 0);
+        }
+    }
     else
     {
         printf("Header không hợp lệ: %s\n", header);
