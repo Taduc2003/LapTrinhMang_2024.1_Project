@@ -54,9 +54,9 @@ int display_main_menu() {
     {
         printf("---------------WELCOME TO DUNG DE TIEN ROI---------------\n");
         printf("1. Tao phong\n");
-        printf("2. Tim phong\n");
+        printf("2. Vao phong theo ID\n");
         printf("3. Xem tat ca cac phong\n");
-        printf("4. Exit\n");
+        printf("4. Dang xuat\n");
         int choice;
         scanf("%d", &choice);
         while (choice < 1 || choice > 4)

@@ -12,6 +12,8 @@
 #define SERV_PORT 3000 /*port*/
 #define LISTENQ 8      /*maximum number of client connections */
 
+char user_id[MAXLINE]; // Định nghĩa biến user_id
+
 int main(int argc, char **argv)
 {
     int listenfd, connfd, n;

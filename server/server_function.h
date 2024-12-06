@@ -15,6 +15,11 @@ void send_message(char *header, char *data, int connfd);
 void handle_login_request(char *data, int connfd);
 void handle_register_request(char *data, int connfd);
 void handle_create_room_request(int connfd);
+void handle_view_all_room_request(int connfd);
+void handle_join_room_request(char *data, int connfd, char *user_id);
+int join_room(char *room_id, int connfd, char *user_id);
+
+extern char user_id[MAXLINE]; // Khai báo biến user_id
 
 void handle_login_request(char *data, int connfd)
 {
@@ -30,13 +35,13 @@ void handle_login_request(char *data, int connfd)
 
     // Kiểm tra đăng nhập
     int response = check_login(username, password);
-    if (response == 0)
+    if (response >= 0)
     {
-        send_message("LOGIN_RES", "0", connfd); // Đăng nhập thành công
+        send_message("LOGIN_RES", "response", connfd); // Đăng nhập thành công
     }
     else
     {
-        send_message("LOGIN_RES", "1", connfd); // Đăng nhập thất bại
+        send_message("LOGIN_RES", "-1", connfd); // Đăng nhập thất bại
     }
 }
 
@@ -71,7 +76,7 @@ void handle_register_request(char *data, int connfd)
 void handle_create_room_request(int connfd)
 {
     char response[MAXLINE];
-    int numbers = 3; // Số người chơi mặc định khi tạo phòng mới
+    int numbers = 0; 
 
     // Chèn phòng vào cơ sở dữ liệu
     if (insert_rooms_table(numbers) == 0)
@@ -89,15 +94,10 @@ void handle_create_room_request(int connfd)
     send_message("CREATE_ROOM_RES", response, connfd);
 }
 
-// Trích xuất username và password từ data
-
-// server.c
-void handle_view_all_room_request(int connfd, char *buffer)
+void handle_view_all_room_request(int connfd)
 {
-    if (strncmp(buffer, "HEADER: VIEW_ALL_ROOMS_REQ", 26) == 0)
-    {
-        printf("Server received VIEW_ALL_ROOMS_REQ\n");
-
+        printf("Server đã nhận yêu cầu VIEW_ALL_ROOMS_REQ\n");
+        printf("Đang xử lí Xem danh sách phòng...\n");
         // Lấy thông tin các phòng từ cơ sở dữ liệu
         char *rooms_info = get_all_rooms();
         if (rooms_info != NULL)
@@ -111,13 +111,58 @@ void handle_view_all_room_request(int connfd, char *buffer)
             // Lỗi khi truy vấn cơ sở dữ liệu
             send_message("ERROR", "Lỗi khi truy vấn danh sách phòng.", connfd);
         }
+}
+
+void handle_join_room_request(char *data, int connfd, char *user_id)
+{
+    char room_id[10] = {0};
+
+    // Trích xuất ID phòng từ data
+    if (sscanf(data, "room_id: %9s", room_id) != 1)
+    {
+        send_message("JOIN_ROOM_RES", "Invalid data format", connfd);
+        return;
+    }
+
+    int room_id_int = atoi(room_id); // Chuyển đổi room_id thành số nguyên
+    char room_id_str[10];
+    sprintf(room_id_str, "%d", room_id_int); // Chuyển đổi số nguyên thành chuỗi
+    int response = join_room(room_id_str, connfd, user_id); // Gọi hàm join_room với kiểu dữ liệu đúng
+    if (response == 0)
+    {
+        send_message("JOIN_ROOM_RES", "0", connfd); // Tham gia phòng thành công
     }
     else
     {
-        // Phản hồi lỗi nếu yêu cầu không hợp lệ
-        send_message("ERROR", "Unknown request type", connfd);
+        send_message("JOIN_ROOM_RES", "1", connfd); // Lỗi khi tham gia phòng
     }
 }
+
+int join_room(char *room_id, int connfd, char *user_id)
+{
+    int status = check_room_status(atoi(room_id));
+    if (status == -1)
+    {
+        printf("Phòng không tồn tại.\n");
+        return 0;
+    }
+    else if (status == 1)
+    {
+        printf("Phòng đang chơi.\n");
+        return 0;
+    }
+
+    // Cập nhật số lượng người trong phòng
+    int currentNumbers = get_current_numbers(atoi(room_id)); // Hàm này cần được định nghĩa để lấy số lượng hiện tại
+    update_room_status(atoi(room_id), status, currentNumbers + 1);
+
+    // Cập nhật thông tin người chơi vào phòng
+    update_player_in_room(atoi(room_id), atoi(user_id), 1, 0); // Giả sử round = 1 và money = 0
+
+    return status;
+}
+
+// Xử lí thông điệp gửi đến
 
 void send_message(char *header, char *data, int connfd)
 {
@@ -131,7 +176,7 @@ void send_message(char *header, char *data, int connfd)
 void process_message(char *msg, int n, int connfd)
 {
     msg[n] = '\0';                        // Đảm bảo chuỗi null-terminated
-    printf("Server received: %s\n", msg); // Debug thông điệp nhận
+    printf("Server đã nhận: %s\n", msg); // Debug thông điệp nhận
 
     char header[MAXLINE] = {0};
     char data[MAXLINE] = {0};
@@ -192,21 +237,18 @@ void process_message(char *msg, int n, int connfd)
     }
     else if (strcmp(header, "VIEW_ALL_ROOMS_REQ") == 0)
     {
-        printf("Received VIEW_ALL_ROOMS_REQ\n");
-
-        // Gọi hàm xử lý yêu cầu
-        handle_view_all_room_request(connfd, data);
+        handle_view_all_room_request(connfd);
     }
+    else if (strcmp(header, "JOIN_ROOM_REQ") == 0)
+    {
+        handle_join_room_request(data, connfd, user_id);
+    }
+    
     else
     {
-        printf("Unknown request type: %s\n", header);
-        send_message("ERROR", "Unknown request type", connfd); // Phản hồi lỗi
+        printf("Header không hợp lệ: %s\n", header);
+        send_message("ERROR", "HEADER không hợp lệ", connfd); // Phản hồi lỗi
     }
-
-    // Gửi phản hồi về client
-    char response[] = "Response from server"; // Thay đổi nội dung phản hồi nếu cần
-    send_message("RESPONSE", response, connfd);
-    printf("Response sent to client: %s\n", response);
 }
 
 #endif // SERVER_FUNCTION_H

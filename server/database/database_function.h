@@ -212,45 +212,69 @@ void display_users_table()
 }
 
 int check_login(char *username, char *password)
+
 {
+
     open_database();
 
-    int check = -1;
-    const char *select_query = "SELECT * FROM users WHERE username = ?;";
+    int userId = -1; // Khởi tạo userId là -1
+
+    const char *select_query = "SELECT id, password FROM users WHERE username = ?;"; // Chọn id và password
+
     sqlite3_stmt *stmt;
+
     if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
     {
+
         sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
-        while (sqlite3_step(stmt) == SQLITE_ROW)
+
+        if (sqlite3_step(stmt) == SQLITE_ROW) // Kiểm tra nếu có dòng kết quả
         {
-            check = 1;
-            const char *retrievedPassword = (const char *)sqlite3_column_text(stmt, 2);
-            check = strcmp(password, retrievedPassword);
-            printf("Username: %s, Password: %s, Retrieved Password: %s\n", username, password, retrievedPassword);
+
+            userId = sqlite3_column_int(stmt, 0); // Lấy id của user
+
+            const char *retrievedPassword = (const char *)sqlite3_column_text(stmt, 1);
+
+            if (strcmp(password, retrievedPassword) == 0) // So sánh mật khẩu
+
+            {
+                printf("Login successful\n");
+
+                sqlite3_finalize(stmt);
+
+                close_database();
+
+                return userId; // Trả về id của user
+            }
+
+            else
+
+            {
+
+                printf("Login failed, incorrect password\n");
+            }
+        }
+
+        else
+
+        {
+
+            printf("Login failed, user not found\n");
         }
 
         sqlite3_finalize(stmt);
-
-        if (check == 0)
-        {
-            printf("Login successful\n");
-            return 0;
-        }
-        if (check == 1)
-        {
-            printf("Login failed, incorrect password\n");
-            return 1;
-        }
-        printf("Login failed, user not found\n");
-        return 2;
     }
+
     else
+
     {
+
         fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
-        return 3;
     }
 
     close_database();
+
+    return -1; // Trả về -1 nếu không tìm thấy user
 }
 
 void create_questions_table()
@@ -425,7 +449,7 @@ void insert_sample_questions()
                            "Mảnh vụn của thiên thạch đi vào khí quyển Trái Đất",
                            "Một hành tinh cháy trong vũ trụ",
                            2, 10);
-    insert_questions_table("Văn hóa dân gian: Tượng Phật bằng đồng lớn nhất Việt Nam nằm ở đâu?", "Yên Tử", "Chùa Bái Đính", "Chùa Hương", 1, 10);
+    insert_questions_table("Văn hóa dân gian: Tượng Phật bằng đồng lớn nhất Việt Nam nằm ở đâu?", "Yên Tử", "Cha Bái Đính", "Chùa Hương", 1, 10);
     insert_questions_table("Địa lý: Hồ nước nào lớn nhất thế giới tính theo diện tích mặt nước?", "Hồ Baikal", "Hồ Superior", "Hồ Victoria", 2, 10);
 }
 
@@ -582,8 +606,7 @@ int update_room_table(int id, int status, int numbers)
 }
 char *get_all_rooms()
 {
-    sqlite3 *db;
-    sqlite3_open("database.db", &db); // Mở cơ sở dữ liệu
+    open_database();
 
     const char *query = "SELECT id, numbers, status FROM rooms;"; // Truy vấn tất cả các phòng
     sqlite3_stmt *stmt;
@@ -627,8 +650,7 @@ char *get_all_rooms()
         strcat(buffer, room_info);
     }
 
-    sqlite3_finalize(stmt); // Giải phóng bộ nhớ
-    sqlite3_close(db);      // Đóng cơ sở dữ liệu
+    close_database();
 
     return buffer; // Trả về chuỗi kết quả
 }
@@ -724,4 +746,115 @@ Ranking *search_rankings_by_roomId_round(int roomId, int round)
 
     close_database();
     return rankings;
+}
+
+int check_room_status(int roomId)
+{
+    open_database();
+    const char *select_query = "SELECT status FROM rooms WHERE id = ?;";
+    sqlite3_stmt *stmt;
+    int status = -1; // -1 có nghĩa là phòng không tồn tại
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, roomId);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            status = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database();
+    return status; // Trả về trạng thái phòng
+}
+
+int update_room_status(int roomId, int newStatus, int newNumbers)
+{
+    open_database();
+    const char *update_query = "UPDATE rooms SET status = ?, numbers = ? WHERE id = ?;";
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, update_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, newStatus);
+        sqlite3_bind_int(stmt, 2, newNumbers);
+        sqlite3_bind_int(stmt, 3, roomId);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't update data: %s\n", sqlite3_errmsg(db));
+            sqlite3_finalize(stmt);
+            close_database();
+            return 1; // Thất bại
+        }
+
+        sqlite3_finalize(stmt);
+        close_database();
+        return 0; // Thành công
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        close_database();
+        return 1; // Thất bại
+    }
+}
+
+int update_player_in_room(int roomId, int userId, int round, int money)
+{
+    open_database();
+    const char *insert_query = "INSERT INTO ranking_round (roomId, userId, round, money) VALUES (?, ?, ?, ?);";
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, insert_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, roomId);
+        sqlite3_bind_int(stmt, 2, userId);
+        sqlite3_bind_int(stmt, 3, round);
+        sqlite3_bind_int(stmt, 4, money);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't insert data: %s\n", sqlite3_errmsg(db));
+            sqlite3_finalize(stmt);
+            close_database();
+            return 1; // Thất bại
+        }
+
+        sqlite3_finalize(stmt);
+        close_database();
+        return 0; // Thành công
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        close_database();
+        return 1; // Thất bại
+    }
+}
+
+int get_current_numbers(int roomId){
+    open_database();
+    const char *select_query = "SELECT numbers FROM rooms WHERE id = ?;";
+    sqlite3_stmt *stmt;
+    int numbers = 0;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK){
+        sqlite3_bind_int(stmt, 1, roomId);
+        if (sqlite3_step(stmt) == SQLITE_ROW){
+            numbers = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    else{
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database();
+    return numbers;
 }
