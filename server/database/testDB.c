@@ -45,15 +45,13 @@ void test_get_all_rooms()
         printf("Không thể lấy danh sách các phòng.\n");
     }
 }
-
+void test_display_ranking_round_by_roomId()
+{
+    int testRoomId = 13;                          // Thay đổi roomId này để kiểm tra
+    display_ranking_round_by_roomId(testRoomId); // Gọi hàm hiển thị
+}
 int main()
 {
-    display_users_table();
-    insert_rooms_table(4);
-    insert_rooms_table(2);
-    insert_rooms_table(6);
-
-    // Kiểm tra hàm get_all_rooms
-    test_get_all_rooms();
+    test_display_ranking_round_by_roomId();
     return 0;
 }

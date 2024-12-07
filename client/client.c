@@ -85,7 +85,7 @@ int main(int argc, char **argv)
 void process_message(char *msg, int n)
 {
     msg[n] = '\0';                           // Đảm bảo thông điệp là chuỗi null-terminated
-    printf("Processing message: %s\n", msg); // Có thể giữ lại dòng này cho debug
+    printf("Processing message from server: %s\n", msg); // Có thể giữ lại dòng này cho debug
 
     char header[MAXLINE];
     char data[MAXLINE];
@@ -188,11 +188,11 @@ void process_message(char *msg, int n)
     {
         if (strcmp(data, "0") == 0)
         {
-            printf("Tham gia phòng thất bại.\n");
+            printf("Tham gia phòng thành công.\n");
         }
         else
         {
-            printf("Tham gia phòng thành công!\n");
+            printf("Tham gia phòng thất bại!\n");
         }
         return;
     }
@@ -273,7 +273,7 @@ void login_user(int sockfd)
         sender_acc = display_login_menu(); // Hiển thị màn hình nhập thông tin đăng nhập
         sprintf(header, "LOGIN_REQ");
         sprintf(data, "username: %s; password: %s", sender_acc.username, sender_acc.password);
-        send_message(header, data, sockfd); // G��i thông điệp đăng nhập đến server
+        send_message(header, data, sockfd); // Gửi thông điệp đăng nhập đến server
 
         if (recv(sockfd, recvline, MAXLINE, 0) == 0) // Kiểm tra phản hồi từ server
         {
@@ -293,10 +293,11 @@ void login_user(int sockfd)
             data_start += 6; // Bỏ qua "DATA: " để chỉ lấy phần giá trị thực tế
             if (strncmp(data_start, "0", 1) == 0)
             { // Kiểm tra dữ liệu "0" (Đăng nhập thành công)
+                printf("Đăng nhập thành công!\n");
                 menu_user(sockfd);
                 break;
             }
-            else if (strncmp(data_start, "1", 1) == 0)
+            else if (strncmp(data_start, "-1", 2) == 0)
             { // Đăng nhập thất bại
                 printf("Sai tên đăng nhập hoặc mật khẩu. Vui lòng thử lại.\n");
                 printf("1. Thử lại\n");
@@ -308,6 +309,12 @@ void login_user(int sockfd)
                 { // Quay lại menu chính
                     break;
                 }
+            }
+            else if (atoi(data_start) > 0) // Kiểm tra nếu data là ID người dùng
+            {
+                printf("Đăng nhập thành công với ID: %s\n", data_start);
+                menu_user(sockfd);
+                break;
             }
             else
             { // Dữ liệu không hợp lệ từ server
@@ -425,21 +432,65 @@ void join_room(int sockfd, char *room_id, char *user_id)
 {
     char recvline[MAXLINE];
 
-    printf("Đang gửi yêu cầu về tham gia phòng...\n");
-
-    char request[200];
-    sprintf(request, "HEADER: JOIN_ROOM_REQ; DATA: %s %s", room_id, user_id);
-    send(sockfd, request, strlen(request), 0); // Gửi yêu cầu về tham gia phòng
-
-    // Nhận phản hồi từ server
-    if (recv(sockfd, recvline, MAXLINE, 0) == 0) // Kiểm tra phản hồi từ server
+    while (1)
     {
-        printf("Máy chủ đã kết thúc sớm, không có phản hồi.\n");
-        exit(4);
+        printf("Đang gửi yêu cầu về tham gia phòng...\n");
+
+        char request[200];
+        sprintf(request, "HEADER: JOIN_ROOM_REQ; DATA: %s %s", room_id, user_id);
+        send(sockfd, request, strlen(request), 0); // Gửi yêu cầu về tham gia phòng
+
+        // Nhận phản hồi từ server
+        if (recv(sockfd, recvline, MAXLINE, 0) == 0) // Kiểm tra phản hồi từ server
+        {
+            printf("Máy chủ đã kết thúc sớm, không có phản hồi.\n");
+            exit(4);
+        }
+
+        process_message(recvline, strlen(recvline)); // Kết thúc chuỗi
+
+        // Sau khi vào phòng thành công thì add vào main game
+        char *data_start = strstr(recvline, "DATA: ");
+        if (data_start != NULL)
+        {
+            data_start += 6; // Bỏ qua "DATA: " để chỉ lấy phần giá trị thực tế
+            if (strncmp(data_start, "0", 1) == 0)
+            { // Kiểm tra dữ liệu "0" (Đăng nhập thành công)
+                printf("Vào phòng thành công!\n");
+                while (1)
+                {
+                    int choice = display_in_room_menu(room_id);
+                    if (choice == 1)
+                    {
+                        printf("Hiển thị thông tin phòng\n");
+                    }
+                    else if (choice == 2)
+                    {
+                        printf("Thoat phong\n");
+                        return;
+                    }
+                }
+            }
+            else if (strncmp(data_start, "1", 1) == 0)
+            {
+                printf("Bạn không thể vào phòng vì một vài lí do. Vui lòng thử lại.\n");
+                printf("1. Thử lại\n");
+                printf("2. Quay lại menu chính\n");
+                int retry_choice;
+                scanf("%d", &retry_choice);
+
+                if (retry_choice == 2)
+                { // Quay lại menu chính
+                    break;
+                }
+            }
+            else
+            { // Dữ liệu không hợp lệ từ server
+                printf("Dữ liệu không hợp lệ từ server: %s\n", data_start);
+            }
+        }
+        // Hiện thị thông báo kết thúc
+        printf("\nKết thúc phản hồi về Join phòng .\n");
     }
-
-    process_message(recvline, strlen(recvline)); // Kết thúc chuỗi
-
-    // Hiện thị thông báo kết thúc
-    printf("\nKết thúc phản hồi về Xem danh sách phòng .\n");
+    
 }

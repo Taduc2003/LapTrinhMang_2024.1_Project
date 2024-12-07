@@ -639,7 +639,7 @@ char *get_all_rooms()
         // Format thông tin phòng và nối vào buffer
         char room_info[256];
         snprintf(room_info, sizeof(room_info), "Phòng ID: %d, Số lượng người: %d, Trạng thái: %s\n",
-                 id, numbers, status == 0 ? "Đang chờ" : "Đang chơi");
+                 id, numbers, status == -1 ? "Không tồn tại" : status == 0 ? "Đang chờ" : status == 1 ? "Đang chơi" : "Đã huỷ");
 
         // Kiểm tra nếu buffer đã đầy, cấp phát thêm bộ nhớ
         if (strlen(buffer) + strlen(room_info) >= 1024)
@@ -857,4 +857,38 @@ int get_current_numbers(int roomId){
 
     close_database();
     return numbers;
+}
+
+void display_ranking_round_by_roomId(int roomId)
+{
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *query = "SELECT userId, round, money FROM ranking_round WHERE roomId = ?;"; // Truy vấn dữ liệu
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, roomId); // Gán giá trị roomId vào truy vấn
+
+        printf("Dữ liệu bảng ranking_round cho roomId %d:\n", roomId);
+        printf("UserId\tRound\tMoney\n");
+        printf("-------------------------\n");
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) // Duyệt qua từng dòng kết quả
+        {
+            int userId = sqlite3_column_int(stmt, 0);
+            int round = sqlite3_column_int(stmt, 1);
+            int money = sqlite3_column_int(stmt, 2);
+
+            printf("%d\t%d\t%d\n", userId, round, money); // Hiển thị thông tin
+        }
+
+        sqlite3_finalize(stmt); // Giải phóng câu lệnh
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
 }

@@ -16,8 +16,8 @@ void handle_login_request(char *data, int connfd);
 void handle_register_request(char *data, int connfd);
 void handle_create_room_request(int connfd);
 void handle_view_all_room_request(int connfd);
-void handle_join_room_request(char *data, int connfd, char *user_id);
-int join_room(char *room_id, int connfd, char *user_id);
+void handle_join_room_request(char *data, int connfd);
+int process_join_room(char *room_id, int connfd, char *user_id);
 
 extern char user_id[MAXLINE]; // Khai báo biến user_id
 
@@ -37,7 +37,9 @@ void handle_login_request(char *data, int connfd)
     int response = check_login(username, password);
     if (response >= 0)
     {
-        send_message("LOGIN_RES", "response", connfd); // Đăng nhập thành công
+        char resp_str[10];
+        sprintf(resp_str, "%d", response);
+        send_message("LOGIN_RES", resp_str, connfd);
     }
     else
     {
@@ -113,21 +115,20 @@ void handle_view_all_room_request(int connfd)
         }
 }
 
-void handle_join_room_request(char *data, int connfd, char *user_id)
+void handle_join_room_request(char *data, int connfd)
 {
+    printf("Servereah nhận yêu cầu JOIN_ROOM_REQ\n");
     char room_id[10] = {0};
+    char user_id[10] = {0};
 
-    // Trích xuất ID phòng từ data
-    if (sscanf(data, "room_id: %9s", room_id) != 1)
+    // Trích xuất ID phòng và ID người dùng từ data
+    if (sscanf(data, "%9s %9s", room_id, user_id) != 2)
     {
         send_message("JOIN_ROOM_RES", "Invalid data format", connfd);
         return;
     }
-
-    int room_id_int = atoi(room_id); // Chuyển đổi room_id thành số nguyên
-    char room_id_str[10];
-    sprintf(room_id_str, "%d", room_id_int); // Chuyển đổi số nguyên thành chuỗi
-    int response = join_room(room_id_str, connfd, user_id); // Gọi hàm join_room với kiểu dữ liệu đúng
+    printf("Đang xử lí trong data với ID phòng: %s, ID người dùng: %s\n", room_id, user_id);
+    int response = process_join_room(room_id, connfd, user_id); // Gọi hàm join_room với kiểu dữ liệu đúng
     if (response == 0)
     {
         send_message("JOIN_ROOM_RES", "0", connfd); // Tham gia phòng thành công
@@ -138,19 +139,29 @@ void handle_join_room_request(char *data, int connfd, char *user_id)
     }
 }
 
-int join_room(char *room_id, int connfd, char *user_id)
+int process_join_room(char *room_id, int connfd, char *user_id)
 {
     int status = check_room_status(atoi(room_id));
-    if (status == -1)
-    {
-        printf("Phòng không tồn tại.\n");
-        return 0;
-    }
-    else if (status == 1)
-    {
-        printf("Phòng đang chơi.\n");
-        return 0;
-    }
+        if (status == -1)
+        {
+            printf("Phòng không tồn tại.\n");
+            return 1;
+        }
+        else if (status == 1)
+        {
+            printf("Phòng đang chơi.\n");
+            return 1;
+        }
+        else if (status == 0)
+        {
+            printf("Phòng đang chờ.\n");
+            // Tiến hành xử lý tham gia phòng
+        }
+        else if (status == 2)
+        {
+            printf("Phòng đã bị huỷ.\n");
+            return 1;
+        }
 
     // Cập nhật số lượng người trong phòng
     int currentNumbers = get_current_numbers(atoi(room_id)); // Hàm này cần được định nghĩa để lấy số lượng hiện tại
@@ -241,7 +252,7 @@ void process_message(char *msg, int n, int connfd)
     }
     else if (strcmp(header, "JOIN_ROOM_REQ") == 0)
     {
-        handle_join_room_request(data, connfd, user_id);
+        handle_join_room_request(data, connfd);
     }
     
     else
