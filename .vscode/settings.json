@@ -1,6 +1,8 @@
 {
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
-        "server_function.h": "c"
+        "server_function.h": "c",
+        "istream": "cpp",
+        "database_function.h": "c"
     }
 }

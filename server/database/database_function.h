@@ -664,6 +664,7 @@ void create_ranking_round_table()
         "userId INTEGER NOT NULL,"
         "round INTEGER NOT NULL,"
         "money INTEGER NOT NULL,"
+        "PRIMARY KEY (roomId, userId, round),"
         "FOREIGN KEY (roomId) REFERENCES rooms(id),"
         "FOREIGN KEY (userId) REFERENCES users(id)"
         ");";
@@ -715,26 +716,26 @@ Ranking *search_rankings_by_roomId_round(int roomId, int round)
 {
     open_database();
 
-    const char *query = "SELECT u.username, r.money FROM Ranking r "
-                        "JOIN Users u ON r.userId = u.id "
+    const char *query = "SELECT u.username, r.money FROM ranking_round r "
+                        "JOIN users u ON r.userId = u.id "
                         "WHERE r.roomId = ? AND r.round = ? "
                         "ORDER BY r.money DESC;";
     sqlite3_stmt *stmt;
     Ranking *rankings = NULL;
-    int *result_count = 0;
+    int result_count = 0;
 
     if (sqlite3_prepare_v2(db, query, -1, &stmt, 0) == SQLITE_OK)
     {
         sqlite3_bind_int(stmt, 1, roomId);
         sqlite3_bind_int(stmt, 2, round);
-        rankings = (Ranking *)malloc(3 * sizeof(Ranking));
+        rankings = malloc(3 * sizeof(Ranking));
 
         while (sqlite3_step(stmt) == SQLITE_ROW)
         {
             // lưu thông tin vào mảng kết quả
-            strncpy(rankings[*result_count].username, (const char *)sqlite3_column_text(stmt, 0), sizeof(rankings[*result_count].username) - 1); // Copy the username to the results array
-            rankings[*result_count].money = sqlite3_column_int(stmt, 1);
-            (*result_count)++;
+            strncpy(rankings[result_count].username, (const char *)sqlite3_column_text(stmt, 0), sizeof(rankings[result_count].username) - 1); // Copy the username to the results array
+            rankings[result_count].money = sqlite3_column_int(stmt, 1);
+            result_count++;
         }
 
         sqlite3_finalize(stmt);
