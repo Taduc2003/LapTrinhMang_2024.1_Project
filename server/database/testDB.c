@@ -47,7 +47,7 @@ void test_get_all_rooms()
 }
 void test_display_ranking_round_by_roomId()
 {
-    int testRoomId = 13;                          // Thay đổi roomId này để kiểm tra
+    int testRoomId = 14;                          // Thay đổi roomId này để kiểm tra
     display_ranking_round_by_roomId(testRoomId); // Gọi hàm hiển thị
 }
 int main()
