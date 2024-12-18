@@ -1,15 +1,14 @@
 CC = gcc
-
 CFLAGS = -Wall
-DBFLAGS = -l sqlite3
+LDFLAGS = -l sqlite3
 
-all: clean test.out run_test
+all: testDB.out
 
-test.out: 
-	${CC} ${CFLAGS} testDB.c -o testDB.out ${DBFLAGS}
+testDB.out: testDB.c
+	$(CC) $(CFLAGS) -o testDB.out testDB.c $(LDFLAGS)
 
-run_test: 
+run_test: testDB.out
 	./testDB.out
 
-clean: 
-	rm -f *.db *.out all
+clean:
+	rm -f testDB.out
