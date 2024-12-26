@@ -328,7 +328,7 @@ int insert_questions_table(char *content, char *ans1, char *ans2, char *ans3, in
         }
         else
         {
-            printf("users inserted successfully.\n");
+            printf("question inserted successfully.\n");
         }
 
         sqlite3_finalize(stmt);
@@ -359,7 +359,7 @@ Question *search_questions_by_level(int level)
         return NULL;
     }
 
-    int *count = 0; // Khởi tạo số lượng câu hỏi tìm thấy
+    int count = 0; // Khởi tạo số lượng câu hỏi tìm thấy
 
     // Chuẩn bị câu lệnh truy vấn
     if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
@@ -368,18 +368,18 @@ Question *search_questions_by_level(int level)
         sqlite3_bind_int(stmt, 1, level);
 
         // Duyệt qua từng kết quả
-        while (sqlite3_step(stmt) == SQLITE_ROW && *count < MAX_QUESTIONS)
+        while (sqlite3_step(stmt) == SQLITE_ROW && count < MAX_QUESTIONS)
         {
             // Lấy dữ liệu từ hàng hiện tại
-            questions[*count].id = sqlite3_column_int(stmt, 0);
-            strncpy(questions[*count].content, (const char *)sqlite3_column_text(stmt, 1), sizeof(questions[*count].content) - 1);
-            strncpy(questions[*count].ans1, (const char *)sqlite3_column_text(stmt, 2), sizeof(questions[*count].ans1) - 1);
-            strncpy(questions[*count].ans2, (const char *)sqlite3_column_text(stmt, 3), sizeof(questions[*count].ans2) - 1);
-            strncpy(questions[*count].ans3, (const char *)sqlite3_column_text(stmt, 4), sizeof(questions[*count].ans3) - 1);
-            questions[*count].correctAns = sqlite3_column_int(stmt, 5);
-            questions[*count].level = sqlite3_column_int(stmt, 6);
+            questions[count].id = sqlite3_column_int(stmt, 0);
+            strncpy(questions[count].content, (const char *)sqlite3_column_text(stmt, 1), sizeof(questions[count].content) - 1);
+            strncpy(questions[count].ans1, (const char *)sqlite3_column_text(stmt, 2), sizeof(questions[count].ans1) - 1);
+            strncpy(questions[count].ans2, (const char *)sqlite3_column_text(stmt, 3), sizeof(questions[count].ans2) - 1);
+            strncpy(questions[count].ans3, (const char *)sqlite3_column_text(stmt, 4), sizeof(questions[count].ans3) - 1);
+            questions[count].correctAns = sqlite3_column_int(stmt, 5);
+            questions[count].level = sqlite3_column_int(stmt, 6);
 
-            (*count)++; // Tăng số lượng câu hỏi tìm thấy
+            count++; // Tăng số lượng câu hỏi tìm thấy
         }
 
         sqlite3_finalize(stmt); // Giải phóng câu lệnh

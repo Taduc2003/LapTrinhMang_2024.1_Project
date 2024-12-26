@@ -13,7 +13,7 @@
 extern char user_id[MAXLINE]; // Khai báo biến user_id
 
 void handle_login_request(char *data, int connfd);
-void handle_logout_request(char *data, int connfd);
+
 void handle_login_request(char *data, int connfd)
 {
     char username[50] = {0};

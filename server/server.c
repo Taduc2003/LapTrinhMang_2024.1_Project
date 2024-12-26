@@ -5,22 +5,31 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h> // Include errno.h
 
 #include "./database/database_function.h"
 #include "./server_function.h"
 #define MAXLINE 4096   /*max text line length*/
 #define SERV_PORT 3000 /*port*/
 #define LISTENQ 8      /*maximum number of client connections */
+#define MAX_CLIENTS 30 // Maximum number of clients
 
 char user_id[MAXLINE]; // Định nghĩa biến user_id
 
 int main(int argc, char **argv)
 {
-    int listenfd, connfd, n;
-    pid_t childpid;
-    socklen_t clilen;
-    char buf[MAXLINE];
+    int listenfd, n;
+    int clients[MAX_CLIENTS]; // Array to hold client sockets
+    fd_set readfds; // Set of socket descriptors
+    int max_sd, sd, activity, new_socket;
     struct sockaddr_in cliaddr, servaddr;
+    socklen_t clilen = sizeof(cliaddr); // Initialize clilen
+    char buf[MAXLINE];
+
+    // Initialize all client sockets to 0
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        clients[i] = 0;
+    }
 
     open_database();
     initialize_database();
@@ -41,6 +50,7 @@ int main(int argc, char **argv)
     if (bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
         perror("Bind failed");
+        close(listenfd);
         exit(1);
     }
 
@@ -48,42 +58,90 @@ int main(int argc, char **argv)
     if (listen(listenfd, LISTENQ) < 0)
     {
         perror("Listen failed");
+        close(listenfd);
         exit(1);
     }
 
-    printf("Server running...waiting for connections.\n");
+    printf("Server running on port %d...waiting for connections.\n", SERV_PORT);
 
-    // Vòng lặp chính
-    for (;;)
-    {
-        clilen = sizeof(cliaddr);
-        if ((connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0)
-        {
-            perror("Accept failed");
+    // Main loop
+    for (;;) {
+        // Clear the socket set
+        FD_ZERO(&readfds);
+
+        // Add listen socket to set
+        FD_SET(listenfd, &readfds);
+        max_sd = listenfd;
+
+        // Add child sockets to set
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            sd = clients[i];
+
+            // If valid socket descriptor then add to read list
+            if (sd > 0) {
+                FD_SET(sd, &readfds);
+            }
+
+            // Highest file descriptor number, needed for the select function
+            if (sd > max_sd) {
+                max_sd = sd;
+            }
+        }
+
+        // Wait for an activity on one of the sockets
+        activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
+
+        if ((activity < 0) && (errno != EINTR)) {
+            perror("select error");
             continue;
         }
 
-        printf("Received request...\n");
-
-        if ((childpid = fork()) == 0)
-        { // Tạo tiến trình con
-            printf("Forked a new child process to handle the connection\n");
-            close(listenfd); // Tiến trình con không cần listen socket
-
-            while ((n = recv(connfd, buf, MAXLINE, 0)) > 0)
-            {
-                process_message(buf, n, connfd); // Giả sử process_message sẽ xử lý và gửi phản hồi
-                memset(buf, 0, sizeof(buf));     // Xóa bộ đệm
+        // If something happened on the listen socket, then it's an incoming connection
+        if (FD_ISSET(listenfd, &readfds)) {
+            clilen = sizeof(cliaddr); // Initialize clilen before accept
+            if ((new_socket = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0) {
+                perror("Accept failed");
+                continue;
             }
 
-            if (n < 0)
-            {
-                perror("Read error");
+            printf("New connection, socket fd is %d, ip is : %s, port : %d\n", new_socket, inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+
+            // Add new socket to array of sockets
+            for (int i = 0; i < MAX_CLIENTS; i++) {
+                if (clients[i] == 0) {
+                    clients[i] = new_socket;
+                    printf("Adding to list of sockets as %d\n", i);
+                    break;
+                }
             }
-            close(connfd);
-            exit(0); // Thoát tiến trình con
         }
-        close(connfd); // Tiến trình cha đóng kết nối client
+
+        // Else it's some IO operation on some other socket
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            sd = clients[i];
+
+            if (FD_ISSET(sd, &readfds)) {
+                // Check if it was for closing, and also read the incoming message
+                if ((n = recv(sd, buf, MAXLINE, 0)) == 0) {
+                    // Somebody disconnected, get his details and print
+                    getpeername(sd, (struct sockaddr *)&cliaddr, &clilen);
+                    printf("Host disconnected, ip %s, port %d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+
+                    // Close the socket and mark as 0 in list for reuse
+                    close(sd);
+                    clients[i] = 0;
+                } else if (n < 0) {
+                    perror("recv error");
+                    close(sd);
+                    clients[i] = 0;
+                } else {
+                    // Process the message
+                    buf[n] = '\0'; // Null-terminate the received data
+                    printf("Received message: %s\n", buf);
+                    process_message(buf, n, sd);
+                }
+            }
+        }
     }
 
     close(listenfd);
