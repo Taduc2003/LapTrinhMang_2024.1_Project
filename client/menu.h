@@ -57,11 +57,12 @@ int display_main_menu() {
         printf("2. Vao phong theo ID\n");
         printf("3. Xem tat ca cac phong\n");
         printf("4. Dang xuat\n");
+        printf("5. Vao game\n");
         int choice;
         scanf("%d", &choice);
-        while (choice < 1 || choice > 4)
+        while (choice < 1 || choice > 5)
         {
-            printf("Please choose 1 - 4: ");
+            printf("Please choose 1 - 5: ");
             scanf("%d", &choice);
         }
         return choice;

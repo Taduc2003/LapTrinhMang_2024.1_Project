@@ -101,12 +101,26 @@ void process_message(char *msg, int n, int connfd)
     }
     else if (strcmp(header, "JOIN_GAME") == 0)
     {     
-        connfds[game_requests++] = connfd;
+        connfds[game_requests] = connfd;
+        printf("Player %d joined with connection %d\n", game_requests + 1, connfd);
+        game_requests++;
+        
         if (game_requests == 3)
         {
-            // Đủ 3 người chơi, bắt đầu game
+            printf("Starting game with connections: %d, %d, %d\n", 
+                   connfds[0], connfds[1], connfds[2]);
+            
+            // Notify all players that game is starting
+            for (int i = 0; i < 3; i++) {
+                send(connfds[i], "GAME_START", strlen("GAME_START"), 0);
+            }
+            
+            // Start the game
             handle_game(connfds[0], connfds[1], connfds[2]);
-            game_requests = 0; // Reset số lượng yêu cầu vào game
+            
+            // Reset for next game
+            game_requests = 0;
+            memset(connfds, 0, sizeof(connfds));
         }
         else
         {

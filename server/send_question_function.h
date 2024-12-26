@@ -11,7 +11,7 @@
 #include "./database/database_function.h"
 
 #define MAX_BUFFER 1000000
-#define MAX_QUESTIONS 50
+#define MAX_QUESTIONS 3
 #define INITIAL_POINTS 1000000
 #define PENALTY_POINTS 200000
 #define TIMEOUT_SECONDS 60
@@ -19,24 +19,24 @@
 typedef struct {
     int connfd;
     int points;
-    int room_id;
+   // int room_id;
 } Player;
 
 void display_ranking_in_round(int room_id, int round) {
     printf("Ranking in round\n");
     printf("Room ID: %d, Round: %d\n", room_id, round);
     printf("Username\tMoney\n");
-    Ranking* rankings = malloc(sizeof(Ranking) * 3);
-    rankings = search_rankings_by_roomId_round(room_id, round);
-    for (int i = 0; i < 3; i++) {
-        if (strlen(rankings[i].username) > 0) {
-            printf("%s\t%d\n", rankings[i].username, rankings[i].money);
+    Ranking* rankings = search_rankings_by_roomId_round(room_id, round);
+    if (rankings != NULL) {
+        for (int i = 0; i < 3; i++) {
+            if (strlen(rankings[i].username) > 0) {
+                printf("%s\t%d\n", rankings[i].username, rankings[i].money);
+            }
         }
+        free(rankings);
     }
     printf("--------\t-----\n");
-    free(rankings);
 }
-
 
 void handle_answer_of_client(Player *player, Question selected_question) {
     char buffer[MAX_BUFFER];
@@ -75,8 +75,12 @@ void handle_answer_of_client(Player *player, Question selected_question) {
 
     // Receive answer from client
     int valread = read(player->connfd, buffer, MAX_BUFFER);
+    if (valread < 0) {
+        perror("recv error");
+        return;
+    }
     buffer[valread] = '\0';
-    printf("Answer from client: %s\n", buffer);
+    printf("Answer from client %d: %s\n", player->connfd,buffer);
 
     // Check if the answer is correct
     int answer = atoi(buffer);
@@ -91,7 +95,7 @@ void handle_answer_of_client(Player *player, Question selected_question) {
 
 void handle_game(int connfd1, int connfd2, int connfd3) {
     char buffer[MAX_BUFFER];
-    srand(time(NULL)); // Seed the random number generator
+    srand(time(NULL));
 
     Player players[3] = {
         {connfd1, INITIAL_POINTS},
@@ -99,49 +103,83 @@ void handle_game(int connfd1, int connfd2, int connfd3) {
         {connfd3, INITIAL_POINTS}
     };
 
-    for (int level = 1; level <= 10; level++) {
-        Question *questions = search_questions_by_level(level);
-        if (questions != NULL) {
-            int num_questions = 0;
-            while (questions[num_questions].id != 0 && num_questions < MAX_QUESTIONS) {
-                num_questions++;
-            }
-
-            if (num_questions > 0) {
-                int random_index = rand() % num_questions;
-                Question selected_question = questions[random_index];
-
-                // Send question and answers to clients
-                snprintf(buffer, MAX_BUFFER, "Level %d: %s\n1. %s\n2. %s\n3. %s\nYour answer: ",
-                         level, selected_question.content, selected_question.ans1, selected_question.ans2, selected_question.ans3);
-                for (int i = 0; i < 3; i++) {
-                    if (players[i].connfd != -1) {
-                        send(players[i].connfd, buffer, strlen(buffer), 0);
-                    }
-                }
-                printf("Question sent to clients: %s\n", selected_question.content);
-
-                // Handle answers from clients
-                for (int i = 0; i < 3; i++) {
-                    if (players[i].connfd != -1) {
-                        handle_answer_of_client(&players[i], selected_question);
-                    }
-                }
-
-            }
-
-            free(questions);
-        } else {
-            printf("No questions found for level %d.\n", level);
+    // Thông báo bắt đầu game
+    strcpy(buffer, "Game is starting!\n");
+    for (int i = 0; i < 3; i++) {
+        if (send(players[i].connfd, buffer, strlen(buffer), 0) == -1) {
+            perror("Error sending start message");
+            return;
         }
     }
 
+    for (int level = 1; level <= 10; level++) {
+        printf("Starting level %d\n", level);
+        
+        // Get questions for current level
+        Question *questions = malloc(MAX_QUESTIONS * sizeof(Question));
+        questions = search_questions_by_level(level);
+        if (questions == NULL) {
+            printf("Error: Could not load questions for level %d\n", level);
+            continue;
+        }
+
+        // Count number of questions
+        int num_questions = 0;
+        while (num_questions < MAX_QUESTIONS && questions[num_questions].id != 0) {
+            num_questions++;
+        }
+
+        if (num_questions == 0) {
+            printf("No questions found for level %d\n", level);
+            continue;
+        }
+
+        // Select random question
+        int random_index = rand() % num_questions;
+        Question selected_question = questions[random_index];
+
+        // Thêm thông báo chuẩn bị trước khi gửi câu hỏi
+        strcpy(buffer, "READY\n");
+        for (int i = 0; i < 3; i++) {
+            if (players[i].connfd != -1) {
+                send(players[i].connfd, buffer, strlen(buffer), 0);
+                // Đợi một chút để client chuẩn bị
+                usleep(500000); // 500ms delay
+            }
+        }
+
+        // Gửi câu hỏi
+        snprintf(buffer, MAX_BUFFER, "QUESTION\nLevel %d: %s\n1. %s\n2. %s\n3. %s\nENDQ\n",
+                 level, selected_question.content, selected_question.ans1, 
+                 selected_question.ans2, selected_question.ans3);
+
+        for (int i = 0; i < 3; i++) {
+            if (players[i].connfd != -1) {
+                send(players[i].connfd, buffer, strlen(buffer), 0);
+            }
+        }
+
+        // Handle answers from active players
+        for (int i = 0; i < 3; i++) {
+            if (players[i].connfd != -1) {
+                handle_answer_of_client(&players[i], selected_question);
+            }
+        }
+
+        // Free questions after use
+        if (questions != NULL) {
+            free(questions);
+            questions = NULL;
+        }
+    }
+
+    // Send game over message
+    strcpy(buffer, "Game Over!\n");
     for (int i = 0; i < 3; i++) {
         if (players[i].connfd != -1) {
-            close(players[i].connfd);
+            send(players[i].connfd, buffer, strlen(buffer), 0);
         }
     }
 }
 
-
-#endif 
+#endif

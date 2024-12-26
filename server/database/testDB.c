@@ -52,6 +52,20 @@ void test_display_ranking_round_by_roomId()
 }
 int main()
 {
-    test_display_ranking_round_by_roomId();
+    //test_display_ranking_round_by_roomId();
+
+
+    // Nếu chưa có data hãy chạy này
+    //---------------------------------------
+    // create_users_table();
+    // create_questions_table();
+    // create_rooms_table();
+    // create_ranking_round_table();
+
+    // insert_users_table("user1", "u1");
+    // insert_users_table("user2", "u2");
+    // insert_users_table("user3", "u3");
+    // insert_sample_questions(); // Thêm câu hỏi 
+    //---------------------------------------
     return 0;
 }

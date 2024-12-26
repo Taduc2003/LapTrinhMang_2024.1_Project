@@ -11,6 +11,7 @@
 #include "client_function_room.h"
 #include "client_function.h"
 
+#define BUFFER_SIZE 1000000
 #define MAXLINE 4096   /*max text line length*/
 #define SERV_PORT 3000 /*port*/
 char user_id[MAXLINE];
@@ -74,3 +75,4 @@ int main(int argc, char **argv)
     exit(0);
 }
 //-------------------------------------------------------------
+

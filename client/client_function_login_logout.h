@@ -9,6 +9,7 @@
 #include "client_function.h"
 #include "menu.h"
 #include "client_function_room.h"
+#include "client_function_game.h"
 
 #define MAXLINE 4096
 
@@ -149,6 +150,9 @@ void menu_user(int sockfd)
             break;
         case 4:
             printf("Logging out...\n");
+            return;
+        case 5:
+            join_game(sockfd);
             return;
         default:
             printf("Lựa chọn không hợp lệ. Vui lòng thử lại.\n");
