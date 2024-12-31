@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <sys/socket.h>
 #include "client_function.h"
+#include "client_function_game.h"
 #include "menu.h"
 #define MAXLINE 4096
 
@@ -93,6 +94,10 @@ void join_room(int sockfd, char *room_id, char *user_id)
                         printf("Hiển thị thông tin phòng\n");
                     }
                     else if (choice == 2)
+                    {
+                        join_game(sockfd, user_id, room_id);
+                        return;
+                    }else if (choice == 3)
                     {
                         printf("Thoat phong\n");
                         return;

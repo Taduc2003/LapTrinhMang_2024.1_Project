@@ -151,9 +151,6 @@ void menu_user(int sockfd)
         case 4:
             printf("Logging out...\n");
             return;
-        case 5:
-            join_game(sockfd);
-            return;
         default:
             printf("Lựa chọn không hợp lệ. Vui lòng thử lại.\n");
         }

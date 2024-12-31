@@ -73,6 +73,7 @@ char *get_all_rooms();
 void create_ranking_round_table();
 int insert_ranking_round_table(int roomId, int userId, int round, int money);
 Ranking *search_rankings_by_roomId_round(int roomId, int round);
+int get_current_money(int roomId, int userId, int round);
 
 void create_users_table()
 {
@@ -892,4 +893,27 @@ void display_ranking_round_by_roomId(int roomId)
     }
 
     close_database(); // Đóng cơ sở dữ liệu
+}
+
+int get_current_money(int roomId, int userId, int round){
+    open_database();
+    const char *select_query = "SELECT money FROM ranking_round WHERE roomId = ? AND userId = ? AND round = ?;";
+    sqlite3_stmt *stmt;
+    int money = 0;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK){
+        sqlite3_bind_int(stmt, 1, roomId);
+        sqlite3_bind_int(stmt, 2, userId);
+        sqlite3_bind_int(stmt, 3, round);
+        if (sqlite3_step(stmt) == SQLITE_ROW){
+            money = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    else{
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database();
+    return money;
 }

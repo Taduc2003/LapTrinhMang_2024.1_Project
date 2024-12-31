@@ -35,7 +35,7 @@ void process_message(char *msg, int n, int connfd)
     char data[MAXLINE] = {0};
 
     static int game_requests = 0; // số lượng yêu cầu vào game
-    static int connfds[3]; // Mảng chứa các kết nối của người chơi
+    static Player *player[3]; // Mảng chứa các kết nối của người chơi
 
     // Tách HEADER và DATA
     char *header_start = strstr(msg, "HEADER: ");
@@ -100,27 +100,38 @@ void process_message(char *msg, int n, int connfd)
         handle_join_room_request(data, connfd);
     }
     else if (strcmp(header, "JOIN_GAME") == 0)
-    {     
-        connfds[game_requests] = connfd;
+    {   
+        // Tách user_id và room_id từ data
+        char user_id[10];
+        char room_id[10];
+        sscanf(data, "%s %s", user_id, room_id);
+        player[game_requests] = (Player *)malloc(sizeof(Player));
+        player[game_requests]->connfd = connfd;
+        player[game_requests]->user_id = atoi(user_id);
+        player[game_requests]->room_id = atoi(room_id);
         printf("Player %d joined with connection %d\n", game_requests + 1, connfd);
         game_requests++;
         
+
         if (game_requests == 3)
         {
             printf("Starting game with connections: %d, %d, %d\n", 
-                   connfds[0], connfds[1], connfds[2]);
+                   player[0]->connfd, player[1]->connfd, player[2]->connfd);
             
             // Notify all players that game is starting
             for (int i = 0; i < 3; i++) {
-                send(connfds[i], "GAME_START", strlen("GAME_START"), 0);
+                send(player[i]->connfd, "GAME_START", strlen("GAME_START"), 0);
             }
             
             // Start the game
-            handle_game(connfds[0], connfds[1], connfds[2]);
+            handle_game(player);
             
             // Reset for next game
             game_requests = 0;
-            memset(connfds, 0, sizeof(connfds));
+            for (int i = 0; i < 3; i++) {
+                free(player[i]);
+                player[i] = NULL;
+            }
         }
         else
         {

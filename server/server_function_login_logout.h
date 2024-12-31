@@ -30,8 +30,8 @@ void handle_login_request(char *data, int connfd)
     int response = check_login(username, password);
     if (response >= 0)
     {
-        char resp_str[10];
-        sprintf(resp_str, "%d", response);
+        char resp_str[12];
+        snprintf(resp_str, sizeof(resp_str), "%d", response);
         send_message("LOGIN_RES", resp_str, connfd);
     }
     else
