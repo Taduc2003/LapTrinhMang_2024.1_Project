@@ -3,6 +3,7 @@
     "files.associations": {
         "server_function.h": "c",
         "istream": "cpp",
-        "database_function.h": "c"
+        "database_function.h": "c",
+        "client_function_room.h": "c"
     }
 }

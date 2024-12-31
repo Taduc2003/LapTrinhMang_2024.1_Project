@@ -6,25 +6,42 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/socket.h>
-#include <unistd.h>  // Add this for STDIN_FILENO
+#include <unistd.h> // Add this for STDIN_FILENO
 
 #define MAXLINE 4096
-#define BUFFER_SIZE 1000000
+#define INITIAL_MONEY 1000000
 
-void clear_stdin() {
+typedef struct PlayerInGame
+{
+    int sockfd;
+    int user_id;
+    int current_money;
+    int room_id;
+} PlayerInGame;
+
+void handle_send_answer(PlayerInGame *playerInGame);
+
+void clear_stdin()
+{
     int c;
-    while ((c = getchar()) != '\n' && c != EOF);
+    while ((c = getchar()) != '\n' && c != EOF)
+        ;
 }
 
-void join_game(int sockfd)
+void join_game(int sockfd, char *user_id, char *room_id)
 {
-    char buffer[BUFFER_SIZE];
+    char buffer[MAXLINE];
     int n;
     fd_set readfds;
     struct timeval timeout;
+    PlayerInGame *playerInGame = malloc(sizeof(PlayerInGame));
+    playerInGame->sockfd = sockfd;
+    playerInGame->user_id = atoi(user_id);
+    playerInGame->current_money = INITIAL_MONEY;
+    playerInGame->room_id = atoi(room_id);
 
     // Gửi yêu cầu tham gia game
-    strcpy(buffer, "HEADER: JOIN_GAME; DATA: ");
+    snprintf(buffer, MAXLINE, "HEADER: JOIN_GAME; DATA: %d %d", playerInGame->user_id, playerInGame->room_id);
     if (send(sockfd, buffer, strlen(buffer), 0) == -1)
     {
         perror("send failed");
@@ -47,7 +64,7 @@ void join_game(int sockfd)
         if (activity < 0)
         {
             perror("select error");
-            pclose(sockfd);
+            close(sockfd);
             exit(1);
         }
         else if (activity == 0)
@@ -59,8 +76,9 @@ void join_game(int sockfd)
 
         if (FD_ISSET(sockfd, &readfds))
         {
+
             // Nhận phản hồi từ server
-            n = recv(sockfd, buffer, BUFFER_SIZE - 1, 0);
+            n = recv(sockfd, buffer, MAXLINE - 1, 0);
             if (n <= 0)
             {
                 if (n == 0)
@@ -71,7 +89,7 @@ void join_game(int sockfd)
                 {
                     perror("recv failed");
                 }
-                pclose(sockfd);
+                close(sockfd);
                 exit(1);
             }
 
@@ -100,89 +118,146 @@ void join_game(int sockfd)
     // Bắt đầu vòng chơi sau khi nhận được "GAME_START"
     while (1)
     {
-        memset(buffer, 0, BUFFER_SIZE);
-        n = recv(sockfd, buffer, BUFFER_SIZE - 1, 0);
-        if (n <= 0) {
-            if (n == 0) printf("Server đã kết thúc game hoặc ngắt kết nối.\n");
-            else perror("recv failed");
+        memset(buffer, 0, MAXLINE);
+        n = recv(sockfd, buffer, MAXLINE - 1, 0);
+        if (n <= 0)
+        {
+            printf("Mất kết nối với server.\n");
             break;
         }
         buffer[n] = '\0';
-
-        // Kiểm tra thông báo chuẩn bị
-        if (strstr(buffer, "READY") != NULL) {
-            printf("Chuẩn bị nhận câu hỏi...\n");
-            continue;
-        }
 
         // Kiểm tra nếu là câu hỏi
         if (strstr(buffer, "QUESTION") != NULL)
         {
             printf("\n----------------------------------------\n");
-            printf("|||            CÂU HỎI MỚI           |||\n");
+            printf("|||             CÂU HỎI MỚI           |||\n");
             printf("----------------------------------------\n");
             printf("%s\n", buffer);
             printf("----------------------------------------\n");
-            
-            char answer[10];
-            memset(answer, 0, sizeof(answer));
-            
-            // Đọc input với timeout mà không cần clear stdin
-            fd_set rfds;
-            struct timeval tv;
-            FD_ZERO(&rfds);
-            FD_SET(STDIN_FILENO, &rfds);
-            tv.tv_sec = 58;
-            tv.tv_usec = 0;
 
-            printf(">>> Nhập câu trả lời của bạn (1, 2, hoặc 3): ");
-            fflush(stdout);
-
-            int retval = select(STDIN_FILENO + 1, &rfds, NULL, NULL, &tv);
-            if (retval > 0) 
+            handle_send_answer(playerInGame);
+        }
+        else if (strstr(buffer, "GAME_OVER") != NULL)
+        {
+            printf("%s\n", buffer);
+            break;
+        }
+        else if (strstr(buffer, "WIN") != NULL)
+        {
+            printf("%s\n", buffer);
+            break;
+        }
+        else if (strstr(buffer, "KQ") != NULL)
+        {
+            char *token = strtok(buffer, "|"); // Split by delimiter
+            if (token != NULL)
             {
-                if (scanf("%1s", answer) == 1)
+                // Skip "KQ" prefix and print result
+                char *result = token + 3;
+                printf("Kết quả: %s", result);
+
+                // Get money status part
+                token = strtok(NULL, "|");
+                if (token != NULL && strstr(token, "CURRENT_MONEY") != NULL)
                 {
-                    // Xử lý ký tự newline còn lại trong buffer
-                    int c;
-                    while ((c = getchar()) != '\n' && c != EOF);
-                    
-                    if (answer[0] >= '1' && answer[0] <= '3')
-                    {
-                        send(sockfd, answer, 1, 0);
-                        printf("Đã gửi câu trả lời: %s\n", answer);
-                    }
-                    else
-                    {
-                        printf("Câu trả lời không hợp lệ, gửi 0\n");
-                        send(sockfd, "0", 1, 0);
-                    }
+                    // Skip "CURRENT_MONEY" prefix and convert to integer
+                    char *money_str = token + 13;
+                    playerInGame->current_money = atoi(money_str);
+                    printf("Số tiền hiện tại: %d\n", playerInGame->current_money);
                 }
             }
-            else if (retval == 0)
-            {
-                printf("\nHết thời gian trả lời!\n");
-                send(sockfd, "0", 1, 0);
-            }
-
-            // Đợi kết quả từ server
-            memset(buffer, 0, BUFFER_SIZE);
-            n = recv(sockfd, buffer, BUFFER_SIZE - 1, 0);
-            if (n > 0) {
-                buffer[n] = '\0';
-                printf("Kết quả: %s\n", buffer);
-            }
-        }
-        else if (strstr(buffer, "Game Over") != NULL)
-        {
-            printf("Game kết thúc!\n");
-            break;
         }
         else
         {
             printf("Server: %s", buffer);
         }
+
+        // Exit to main menu if current_money is 0
+        if (playerInGame->current_money == 0)
+        {
+            printf("You have run out of money. Returning to main menu.\n");
+            break;
+        }
     }
+
+    free(playerInGame);
+    return; // Return to main menu
+}
+
+typedef struct
+{
+    int answer;
+    int bet_amount;
+} BetAnswer;
+
+void handle_send_answer(PlayerInGame *playerInGame)
+{
+    BetAnswer *bets = malloc(2 * sizeof(BetAnswer));
+
+    // Khởi tạo bet ở mỗi vòng là 0
+    for (int i = 0; i < 2; i++)
+    {
+        bets[i].answer = 0;
+        bets[i].bet_amount = 0;
+    }
+
+    printf("Nhập câu trả lời 1 (1, 2, hoặc 3): ");
+    scanf("%d", &bets[0].answer);
+    clear_stdin();
+
+    while (1)
+    {
+        printf(">>> Đặt cược cho câu trả lời 1:");
+        scanf("%d", &bets[0].bet_amount);
+        clear_stdin();
+        if (bets[0].bet_amount < 0 || bets[0].bet_amount > playerInGame->current_money)
+        {
+            printf("Số tiền cược không hợp lệ. Vui lòng nhập lại.\n");
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    while (1)
+    {
+        printf("\nNhập câu trả lời 2 (1, 2, hoặc 3): ");
+        scanf("%d", &bets[1].answer);
+        clear_stdin();
+
+        if(bets[1].answer == bets[0].answer)
+        {
+            printf("Câu trả lời 2 không được trùng với câu trả lời 1. Vui lòng nhập lại.\n");
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    bets[1].bet_amount = playerInGame->current_money - bets[0].bet_amount;
+    printf(">>> Đặt cược cho câu trả lời 2: %d", bets[1].bet_amount);
+
+    for (int i = 0; i < 2; i++)
+    {
+        if (bets[i].answer < 1 || bets[i].answer > 3)
+        {
+            bets[i].answer = 0;
+            bets[i].bet_amount = 0;
+        }
+    }
+
+    // Gửi cả 2 câu trả lời và tiền cược theo format "answer1:bet1;answer2:bet2"
+    char send_buffer[50];
+    snprintf(send_buffer, sizeof(send_buffer), "%d:%d;%d:%d",
+             bets[0].answer, bets[0].bet_amount,
+             bets[1].answer, bets[1].bet_amount);
+    send(playerInGame->sockfd, send_buffer, sizeof(send_buffer), 0);
+    printf("\nĐã gửi câu trả lời: %s\n", send_buffer);
+
+    free(bets);
 }
 
 #endif // CLIENT_FUNCTION_GAME_H

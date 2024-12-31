@@ -10,126 +10,165 @@
 #include <sys/select.h>
 #include "./database/database_function.h"
 
-#define MAX_BUFFER 1000000
-#define MAX_QUESTIONS 3
+#define MAXLINE 4096
 #define INITIAL_POINTS 1000000
-#define PENALTY_POINTS 200000
+#define PENALTY_POINTS 500000
 #define TIMEOUT_SECONDS 60
 
-typedef struct {
+typedef struct
+{
+    int user_id;
     int connfd;
-    int points;
-   // int room_id;
+    int room_id;
 } Player;
 
-void display_ranking_in_round(int room_id, int round) {
-    printf("Ranking in round\n");
-    printf("Room ID: %d, Round: %d\n", room_id, round);
-    printf("Username\tMoney\n");
-    Ranking* rankings = search_rankings_by_roomId_round(room_id, round);
-    if (rankings != NULL) {
-        for (int i = 0; i < 3; i++) {
-            if (strlen(rankings[i].username) > 0) {
-                printf("%s\t%d\n", rankings[i].username, rankings[i].money);
+typedef struct
+{
+    int answer;
+    int bet_amount;
+} BetAnswer;
+
+char *display_ranking_in_round(int room_id, int round)
+{
+    char *result = malloc(MAXLINE * sizeof(char));
+    snprintf(result, MAXLINE, "Ranking in round\nRoom ID: %d, Round: %d\nUsername\tMoney\n", room_id, round);
+
+    Ranking *rankings = search_rankings_by_roomId_round(room_id, round);
+    if (rankings != NULL)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            if (strlen(rankings[i].username) > 0)
+            {
+                char line[MAXLINE];
+                snprintf(line, MAXLINE, "%s\t%d\n", rankings[i].username, rankings[i].money);
+                strncat(result, line, MAXLINE - strlen(result) - 1);
             }
         }
         free(rankings);
     }
-    printf("--------\t-----\n");
+    strncat(result, "--------\t-----\n", MAXLINE - strlen(result) - 1);
+
+    return result;
 }
 
-void handle_answer_of_client(Player *player, Question selected_question) {
-    char buffer[MAX_BUFFER];
-    fd_set readfds;
-    struct timeval timeout;
-
-    // Set up the timeout
-    timeout.tv_sec = TIMEOUT_SECONDS;
-    timeout.tv_usec = 0;
-
-    // Set up the file descriptor set
-    FD_ZERO(&readfds);
-    FD_SET(player->connfd, &readfds);
-
-    // Wait for the client to respond within the timeout period
-    int activity = select(player->connfd + 1, &readfds, NULL, NULL, &timeout);
-
-    if (activity == 0) {
-        // Timeout occurred, deduct points
-        player->points -= PENALTY_POINTS;
-        if (player->points <= 0) {
-            strcpy(buffer, "You have been kicked out due to insufficient points.\n");
-            send(player->connfd, buffer, strlen(buffer), 0);
-            close(player->connfd);
-            player->connfd = -1; // Mark the player as kicked out
-            return;
-        } else {
-            snprintf(buffer, MAX_BUFFER, "Timeout! You lost %d points. Your current points: %d\n", PENALTY_POINTS, player->points);
-            send(player->connfd, buffer, strlen(buffer), 0);
-            return;
-        }
-    } else if (activity < 0) {
-        perror("select error");
-        return;
-    }
+int handle_answer_of_client(int connfd, int current_money, int correct_answer, int level)
+{
+    char buffer[MAXLINE];
+    BetAnswer bets[2];
 
     // Receive answer from client
-    int valread = read(player->connfd, buffer, MAX_BUFFER);
-    if (valread < 0) {
+    int valread = read(connfd, buffer, MAXLINE);
+    if (valread < 0)
+    {
         perror("recv error");
-        return;
+        return -1;
     }
     buffer[valread] = '\0';
-    printf("Answer from client %d: %s\n", player->connfd,buffer);
 
-    // Check if the answer is correct
-    int answer = atoi(buffer);
+    // Parse answers and bets "answer1:bet1;answer2:bet2"
+    sscanf(buffer, "%d:%d;%d:%d",
+           &bets[0].answer, &bets[0].bet_amount,
+           &bets[1].answer, &bets[1].bet_amount);
 
-    if (answer == selected_question.correctAns) {
-        strcpy(buffer, "Correct\n");
-    } else {
-        strcpy(buffer, "Incorrect\n");
+    char result_str[MAXLINE];
+    snprintf(result_str, MAXLINE, "KQ\n");
+
+    // Check each answer
+    if (bets[0].answer == correct_answer && bets[1].answer == 0) // Neu cau thu nhat tra loi dung va cau 2 khong tra loiloi
+    {
+        current_money -= PENALTY_POINTS;
+        snprintf(buffer, MAXLINE, "%d là câu trả lời ĐÚNG nhưng chưa trả lời xong \n", bets[0].answer);
     }
-    send(player->connfd, buffer, strlen(buffer), 0);
+    else if (bets[0].answer == correct_answer) // Neu cau thu nhat ddng
+    {
+        // Correct answer - keep the bet
+        current_money = bets[0].bet_amount;
+        snprintf(buffer, MAXLINE, "%d là câu trả lời đúng \n", bets[0].answer);
+    }
+    else if (bets[1].answer == correct_answer) // Neu cau thu hai dung
+    {
+        current_money = bets[1].bet_amount;
+        snprintf(buffer, MAXLINE, "%d là câu trả lời Đúng \n", bets[1].answer);
+    }
+    else if (bets[0].answer != correct_answer && bets[1].answer == 0) // Neu cau thu nhat sai va cau thu hai khong tra loi
+    {
+        current_money = current_money - bets[0].bet_amount - PENALTY_POINTS;
+        snprintf(buffer, MAXLINE, "%d là câu trả lời SAI và chưa trả lời xong\n", bets[0].answer);
+    }
+    else if (bets[0].answer == 0) // Neu cau thu nhat khong tra loi
+    {
+        current_money -= PENALTY_POINTS;
+        snprintf(buffer, MAXLINE, "Bạn chưa trả lời hoặc trả lời chưa đúng định dạng\n");
+    }
+    else
+    {
+        current_money = 0;
+        snprintf(buffer, MAXLINE, "Trả lời sai toàn bộ\n");
+    }
+    strcat(result_str, buffer);
+
+    // Send current money status
+    char money_status[MAXLINE];
+    if (current_money <= 0)
+    {
+        current_money = 0;
+    }
+    snprintf(money_status, MAXLINE, "CURRENT_MONEY\n%d\n", current_money);
+    
+
+    // Use a delimiter
+    char full_message[MAXLINE * 2];
+    snprintf(full_message, MAXLINE * 2, "%s|%s", result_str, money_status);
+    send(connfd, full_message, strlen(full_message), 0);
+    return current_money;
 }
 
-void handle_game(int connfd1, int connfd2, int connfd3) {
-    char buffer[MAX_BUFFER];
+void handle_game(Player *players[3])
+{
+    char buffer[MAXLINE];
     srand(time(NULL));
-
-    Player players[3] = {
-        {connfd1, INITIAL_POINTS},
-        {connfd2, INITIAL_POINTS},
-        {connfd3, INITIAL_POINTS}
-    };
+    int current_money[3];
 
     // Thông báo bắt đầu game
-    strcpy(buffer, "Game is starting!\n");
-    for (int i = 0; i < 3; i++) {
-        if (send(players[i].connfd, buffer, strlen(buffer), 0) == -1) {
+    strcpy(buffer, "START_GAME");
+    for (int i = 0; i < 3; i++)
+    {
+        insert_ranking_round_table(players[i]->room_id, players[i]->user_id, 0, INITIAL_POINTS);
+        if (send(players[i]->connfd, buffer, strlen(buffer), 0) == -1)
+        {
             perror("Error sending start message");
             return;
         }
     }
 
-    for (int level = 1; level <= 10; level++) {
+    int active_players = 3;
+
+    for (int level = 1; level <= 4 && active_players > 0; level++)
+    {
         printf("Starting level %d\n", level);
-        
+        for (int i = 0; i < 3; i++)
+        {
+            current_money[i] = get_current_money(players[i]->room_id, players[i]->user_id, level - 1);
+        }
         // Get questions for current level
         Question *questions = malloc(MAX_QUESTIONS * sizeof(Question));
         questions = search_questions_by_level(level);
-        if (questions == NULL) {
+        if (questions == NULL)
+        {
             printf("Error: Could not load questions for level %d\n", level);
             continue;
         }
 
         // Count number of questions
         int num_questions = 0;
-        while (num_questions < MAX_QUESTIONS && questions[num_questions].id != 0) {
+        while (num_questions < MAX_QUESTIONS && questions[num_questions].id != 0)
+        {
             num_questions++;
         }
 
-        if (num_questions == 0) {
+        if (num_questions == 0)
+        {
             printf("No questions found for level %d\n", level);
             continue;
         }
@@ -138,46 +177,136 @@ void handle_game(int connfd1, int connfd2, int connfd3) {
         int random_index = rand() % num_questions;
         Question selected_question = questions[random_index];
 
-        // Thêm thông báo chuẩn bị trước khi gửi câu hỏi
-        strcpy(buffer, "READY\n");
-        for (int i = 0; i < 3; i++) {
-            if (players[i].connfd != -1) {
-                send(players[i].connfd, buffer, strlen(buffer), 0);
-                // Đợi một chút để client chuẩn bị
-                usleep(500000); // 500ms delay
-            }
-        }
-
-        // Gửi câu hỏi
-        snprintf(buffer, MAX_BUFFER, "QUESTION\nLevel %d: %s\n1. %s\n2. %s\n3. %s\nENDQ\n",
-                 level, selected_question.content, selected_question.ans1, 
+        // Prepare question message
+        snprintf(buffer, MAXLINE, "QUESTION\nLevel %d: %s\n1. %s\n2. %s\n3. %s\n",
+                 level, selected_question.content, selected_question.ans1,
                  selected_question.ans2, selected_question.ans3);
 
-        for (int i = 0; i < 3; i++) {
-            if (players[i].connfd != -1) {
-                send(players[i].connfd, buffer, strlen(buffer), 0);
+        // Count active players before each round
+        active_players = 0;
+        for (int i = 0; i < 3; i++)
+        {
+
+            if (current_money[i] > 0)
+            {
+                active_players++;
             }
         }
 
+        if (active_players < 1)
+        {
+            printf("Not enough players to continue. Game ended.\n");
+            // Send game over to remaining player
+            strcpy(buffer, "GAME_OVER\nNot enough players to continue. Game ended.\n");
+            for (int i = 0; i < 3; i++)
+            {
+
+                if (current_money[i] > 0)
+                {
+                    send(players[i]->connfd, buffer, strlen(buffer), 0);
+                }
+            }
+            break;
+        }
+
+        // nếu còn 1 người chơi thì in ra thông báo người chơi đó là người chiến thắng
+        if (active_players == 1)
+        {
+            int max_money = 0;
+            Player *winner;
+            for (int i = 0; i < 3; i++)
+            {
+                if (current_money[i] > max_money)
+                {
+                    max_money = current_money[i];
+                    winner = players[i];
+                }
+            }
+            snprintf(buffer, MAXLINE, "WIN\nNgười chơi %d là người chiến thắng\n", winner->user_id);
+            send(winner->connfd, buffer, strlen(buffer), 0);
+            break;
+        }
+
+        // Send question to all active players
+        for (int i = 0; i < 3; i++)
+        {
+            if (current_money[i] > 0)
+            {
+                if (send(players[i]->connfd, buffer, strlen(buffer), 0) == -1)
+                {
+                    printf("Player %d disconnected\n", players[i]->user_id);
+                    active_players--;
+                    continue;
+                }
+            }
+        }
+
+        int player_answered_num = 0;
+        fd_set readfds;
+        struct timeval timeout;
+
         // Handle answers from active players
-        for (int i = 0; i < 3; i++) {
-            if (players[i].connfd != -1) {
-                handle_answer_of_client(&players[i], selected_question);
+        while (player_answered_num < active_players)
+        {
+            FD_ZERO(&readfds);
+            for (int i = 0; i < 3; i++)
+            {
+                if (current_money[i] > 0)
+                {
+                    FD_SET(players[i]->connfd, &readfds);
+                }
+            }
+
+            timeout.tv_sec = TIMEOUT_SECONDS;
+            timeout.tv_usec = 0;
+
+            int activity = select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
+            if (activity < 0)
+            {
+                perror("select error");
+                break;
+            }
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (current_money[i] > 0 && FD_ISSET(players[i]->connfd, &readfds))
+                {
+                    int update_money = handle_answer_of_client(players[i]->connfd, current_money[i], selected_question.correctAns, level);
+                    insert_ranking_round_table(players[i]->room_id, players[i]->user_id, level, update_money);
+                    player_answered_num++;
+                }
+            }
+        }
+
+        // Send ranking in round
+        for (int i = 0; i < 3; i++)
+        {
+            if (current_money[i] > 0)
+            {
+                strcpy(buffer, display_ranking_in_round(players[i]->room_id, level));
+                if (send(players[i]->connfd, buffer, strlen(buffer), 0) == -1)
+                {
+                    perror("Error sending ranking");
+                    continue;
+                }
             }
         }
 
         // Free questions after use
-        if (questions != NULL) {
+        if (questions != NULL)
+        {
             free(questions);
             questions = NULL;
         }
     }
 
     // Send game over message
-    strcpy(buffer, "Game Over!\n");
-    for (int i = 0; i < 3; i++) {
-        if (players[i].connfd != -1) {
-            send(players[i].connfd, buffer, strlen(buffer), 0);
+    strcpy(buffer, "GAME_OVER\n");
+    for (int i = 0; i < 3; i++)
+    {
+        if (current_money[i] > 0)
+        {
+            send(players[i]->connfd, buffer, strlen(buffer), 0);
         }
     }
 }
