@@ -59,6 +59,12 @@ void create_users_table();
 int search_users_table(char *username);
 int insert_users_table(char *username, char *password);
 int check_login(char *username, char *password);
+
+int is_user_logged_in(const char *username);
+void mark_user_as_logged_in(const char *username);
+void display_users_table();
+void display_all_accounts();
+void mask_user_password(char *password);
 char *get_username_by_id(int id);
 void get_all_user_table();
 
@@ -78,9 +84,6 @@ void create_ranking_round_table();
 int insert_ranking_round_table(int roomId, int userId, int round, int money);
 Ranking *search_rankings_by_roomId_round(int roomId, int round);
 int get_current_money(int roomId, int userId, int round);
-
-int insert_users_rooms_table(int userId, int roomId);
-int delete_users_rooms_table(int userId, int roomId);
 
 void create_users_table()
 {
@@ -972,8 +975,85 @@ void display_ranking_round_by_roomId(int roomId)
     close_database(); // Đóng cơ sở dữ liệu
 }
 
-int get_current_money(int roomId, int userId, int round)
+int is_user_logged_in(const char *username)
 {
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *select_query = "SELECT COUNT(*) FROM users WHERE username = ? AND status = 1;"; // Truy vấn dữ liệu
+    sqlite3_stmt *stmt;
+    int result = 0;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            result = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
+    return result;    // Trả về 1 nếu đã đăng nhập, 0 nếu chưa
+}
+
+void mark_user_as_logged_in(const char *username)
+{
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *update_query = "UPDATE users SET status = 1 WHERE username = ?;"; // Truy vấn cập nhật
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, update_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't update user as logged in: %s\n", sqlite3_errmsg(db));
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
+}
+
+void display_all_accounts()
+{
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *select_query = "SELECT * FROM users;"; // Truy vấn dữ liệu
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        while (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            // Hiển thị toàn bộ trường trong bảng user
+            printf("ID: %d\n", sqlite3_column_int(stmt, 0));
+            printf("Username: %s\n", sqlite3_column_text(stmt, 1));
+            printf("Password: %s\n", sqlite3_column_text(stmt, 2));
+            printf("Is logged in: %d\n", sqlite3_column_int(stmt, 3));
+            printf("\n");
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
+}
+
+int get_current_money(int roomId, int userId, int round){
     open_database();
     const char *select_query = "SELECT money FROM ranking_round WHERE roomId = ? AND userId = ? AND round = ?;";
     sqlite3_stmt *stmt;
@@ -997,147 +1077,4 @@ int get_current_money(int roomId, int userId, int round)
 
     close_database();
     return money;
-}
-
-char *get_username_by_id(int id)
-{
-    open_database();
-    const char *select_query = "SELECT username FROM users WHERE id = ?;";
-    sqlite3_stmt *stmt;
-    char *username = malloc(256);
-
-    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
-    {
-        sqlite3_bind_int(stmt, 1, id);
-        if (sqlite3_step(stmt) == SQLITE_ROW)
-        {
-            strncpy(username, (const char *)sqlite3_column_text(stmt, 0), 256);
-        }
-        sqlite3_finalize(stmt);
-    }
-    else
-    {
-        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
-    }
-
-    close_database();
-    return username;
-}
-
-void get_all_user_table()
-{
-    open_database();
-    const char *query = "SELECT * FROM users;";
-    sqlite3_stmt *stmt;
-
-    if (sqlite3_prepare_v2(db, query, -1, &stmt, 0) == SQLITE_OK)
-    {
-        printf("ID\tUsername\tPassword\tStatus\n");
-        printf("------------------------------------------\n");
-
-        while (sqlite3_step(stmt) == SQLITE_ROW)
-        {
-            int id = sqlite3_column_int(stmt, 0);
-            const char *username = (const char *)sqlite3_column_text(stmt, 1);
-            const char *password = (const char *)sqlite3_column_text(stmt, 2);
-            int status = sqlite3_column_int(stmt, 3);
-
-            printf("%d\t%s\t\t%s\t\t%d\n", id, username, password, status);
-        }
-
-        sqlite3_finalize(stmt);
-    }
-    else
-    {
-        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
-    }
-
-    close_database();
-}
-
-void create_users_rooms_table()
-{
-    open_database();
-    const char *create_table_query =
-        "CREATE TABLE IF NOT EXISTS users_rooms ("
-        "roomId INTEGER NOT NULL,"
-        "userId INTEGER NOT NULL,"
-        "PRIMARY KEY (roomId, userId),"
-        "FOREIGN KEY (roomId) REFERENCES rooms(id),"
-        "FOREIGN KEY (userId) REFERENCES users(id)"
-        ");";
-    if (sqlite3_exec(db, create_table_query, 0, 0, 0) != SQLITE_OK)
-    {
-        fprintf(stderr, "Error: Can't create table: %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
-        return;
-    }
-}
-
-int insert_users_rooms_table(int roomId, int userId)
-{
-    open_database();
-    const char *insert_query = "INSERT INTO users_rooms (roomId, userId) VALUES (?, ?);";
-    sqlite3_stmt *stmt;
-
-    if (sqlite3_prepare_v2(db, insert_query, -1, &stmt, 0) == SQLITE_OK)
-    {
-        sqlite3_bind_int(stmt, 1, roomId);
-        sqlite3_bind_int(stmt, 2, userId);
-
-        if (sqlite3_step(stmt) != SQLITE_DONE)
-        {
-            fprintf(stderr, "Error: Can't insert data: %s\n", sqlite3_errmsg(db));
-        }
-        else
-        {
-            printf("User in room inserted successfully.\n");
-        }
-
-        sqlite3_finalize(stmt);
-        return 0;
-    }
-    else
-    {
-        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
-        return 1;
-    }
-    close_database();
-    // return state
-    // 0 = success
-    // 1 = fail
-}
-
-int delete_users_rooms_table(int roomId, int userId)
-{
-    open_database();
-    const char *delete_query = "DELETE FROM users_rooms WHERE roomId = ? AND userId = ?;";
-    sqlite3_stmt *stmt;
-
-    if (sqlite3_prepare_v2(db, delete_query, -1, &stmt, 0) == SQLITE_OK)
-    {
-        sqlite3_bind_int(stmt, 1, roomId);
-        sqlite3_bind_int(stmt, 2, userId);
-
-        if (sqlite3_step(stmt) != SQLITE_DONE)
-        {
-            fprintf(stderr, "Error: Can't delete data: %s\n", sqlite3_errmsg(db));
-        }
-        else
-        {
-            printf("User in room deleted successfully.\n");
-        }
-
-        sqlite3_finalize(stmt);
-        return 0;
-    }
-    else
-    {
-        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
-        return 1;
-    }
-    close_database();
-    // return state
-    // 0 = success
-    // 1 = fail
 }

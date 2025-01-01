@@ -128,6 +128,12 @@ void login_user(int sockfd)
                 printf("Dữ liệu không hợp lệ từ server: %s\n", data_start);
             }
         }
+
+        if (strncmp(recvline, "Account already logged in", 25) == 0)
+        {
+            printf("Tài khoản đã được sử dụng ở nơi khác. Vui lòng đăng xuất trước khi đăng nhập lại.\n");
+            continue; // Quay lại vòng lặp đăng nhập
+        }
     }
 }
 
