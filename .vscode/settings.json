@@ -4,6 +4,10 @@
         "server_function.h": "c",
         "istream": "cpp",
         "database_function.h": "c",
-        "client_function_room.h": "c"
+        "client_function_room.h": "c",
+        "xiosbase": "cpp",
+        "xlocale": "cpp",
+        "xutility": "cpp",
+        "cmath": "cpp"
     }
 }

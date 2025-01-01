@@ -135,6 +135,8 @@ void join_game(int sockfd, char *user_id, char *room_id)
             printf("----------------------------------------\n");
             printf("%s\n", buffer);
             printf("----------------------------------------\n");
+            printf("Số tiền hiện tại: %d\n", playerInGame->current_money);
+            printf("----------------------------------------\n");
 
             handle_send_answer(playerInGame);
         }
@@ -142,6 +144,15 @@ void join_game(int sockfd, char *user_id, char *room_id)
         {
             printf("%s\n", buffer);
             break;
+        }
+        else if (strstr(buffer, "END_GAME") != NULL)
+        {
+            printf("%s\n", buffer);
+            break;
+        }
+        else if (strstr(buffer, "OVER_MONEY") != NULL)
+        {
+            printf("%s\n", buffer);
         }
         else if (strstr(buffer, "WIN") != NULL)
         {
@@ -171,13 +182,6 @@ void join_game(int sockfd, char *user_id, char *room_id)
         else
         {
             printf("Server: %s", buffer);
-        }
-
-        // Exit to main menu if current_money is 0
-        if (playerInGame->current_money == 0)
-        {
-            printf("You have run out of money. Returning to main menu.\n");
-            break;
         }
     }
 
@@ -227,7 +231,7 @@ void handle_send_answer(PlayerInGame *playerInGame)
         scanf("%d", &bets[1].answer);
         clear_stdin();
 
-        if(bets[1].answer == bets[0].answer)
+        if (bets[1].answer == bets[0].answer)
         {
             printf("Câu trả lời 2 không được trùng với câu trả lời 1. Vui lòng nhập lại.\n");
         }
