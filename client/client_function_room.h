@@ -17,9 +17,6 @@ void create_room(int sockfd);
 void view_all_rooms(int sockfd);
 void join_room(int sockfd, char *room_id, char *user_id);
 
-
-
-
 void create_room(int sockfd)
 {
     char request[200];
@@ -91,16 +88,42 @@ void join_room(int sockfd, char *room_id, char *user_id)
                     int choice = display_in_room_menu(room_id);
                     if (choice == 1)
                     {
-                        printf("Hiển thị thông tin phòng\n");
+                        printf("Yêu cầu hiển thị thông tin phòng...\n");
+
+                        // Gửi yêu cầu xem thông tin phòng đến server
+                        char request[200];
+                        sprintf(request, "HEADER: VIEW_ROOM_INFO_REQ; DATA: %s", room_id);
+                        send(sockfd, request, strlen(request), 0); // Gửi yêu cầu
+
+                        // Nhận phản hồi từ server
+                        char buffer[MAXLINE];
+                        int n = recv(sockfd, buffer, MAXLINE, 0);
+                        buffer[n] = '\0';
+
+                        // Hiển thị thông tin từ server
+                        printf("Thông tin phòng:\n%s\n", buffer);
                     }
                     else if (choice == 2)
                     {
                         join_game(sockfd, user_id, room_id);
                         return;
-                    }else if (choice == 3)
+                    }
+                    else if (choice == 3)
                     {
-                        printf("Thoat phong\n");
-                        return;
+                        printf("Thoát phòng\n");
+
+                        // Gửi yêu cầu thoát phòng đến server
+                        char request[200];
+                        sprintf(request, "HEADER: LEAVE_ROOM_REQ; DATA: %s %s", room_id, user_id);
+                        send(sockfd, request, strlen(request), 0); // Gửi yêu cầu thoát phòng
+
+                        // Nhận phản hồi từ server
+                        char buffer[MAXLINE];
+                        int n = recv(sockfd, buffer, MAXLINE, 0);
+                        buffer[n] = '\0';
+                        printf("Server phản hồi: %s\n", buffer); // Hiển thị phản hồi từ server
+
+                        return; // Thoát khỏi phòng
                     }
                 }
             }

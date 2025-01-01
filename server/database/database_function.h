@@ -277,6 +277,70 @@ int check_login(char *username, char *password)
 
     return -1; // Trả về -1 nếu không tìm thấy user
 }
+char *get_players_in_room(int roomId)
+{
+    open_database();
+
+    const char *query =
+        "SELECT u.username "
+        "FROM ranking_round rr "
+        "JOIN users u ON rr.userId = u.id "
+        "WHERE rr.roomId = ?;";
+
+    sqlite3_stmt *stmt;
+    char *buffer = malloc(1024); // Cấp phát bộ nhớ cho kết quả
+    if (!buffer)
+    {
+        fprintf(stderr, "Error: Memory allocation failed.\n");
+        close_database();
+        return NULL;
+    }
+
+    snprintf(buffer, 1024, "Danh sách người chơi trong phòng %d:\n", roomId);
+
+    if (sqlite3_prepare_v2(db, query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, roomId);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            const char *username = (const char *)sqlite3_column_text(stmt, 0);
+
+            // Định dạng thông tin người chơi
+            char player_info[256];
+            snprintf(player_info, sizeof(player_info), "- %s\n", username);
+
+            // Kiểm tra nếu buffer đầy, cấp phát thêm bộ nhớ
+            if (strlen(buffer) + strlen(player_info) >= 1024)
+            {
+                char *new_buffer = realloc(buffer, strlen(buffer) + strlen(player_info) + 1);
+                if (!new_buffer)
+                {
+                    fprintf(stderr, "Error: Memory reallocation failed.\n");
+                    sqlite3_finalize(stmt);
+                    close_database();
+                    free(buffer);
+                    return NULL;
+                }
+                buffer = new_buffer;
+            }
+
+            strcat(buffer, player_info);
+        }
+
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        free(buffer);
+        close_database();
+        return NULL;
+    }
+
+    close_database();
+    return buffer;
+}
 
 void create_questions_table()
 {
@@ -640,7 +704,9 @@ char *get_all_rooms()
         // Format thông tin phòng và nối vào buffer
         char room_info[256];
         snprintf(room_info, sizeof(room_info), "Phòng ID: %d, Số lượng người: %d, Trạng thái: %s\n",
-                 id, numbers, status == -1 ? "Không tồn tại" : status == 0 ? "Đang chờ" : status == 1 ? "Đang chơi" : "Đã huỷ");
+                 id, numbers, status == -1 ? "Không tồn tại" : status == 0 ? "Đang chờ"
+                                                           : status == 1   ? "Đang chơi"
+                                                                           : "Đã huỷ");
 
         // Kiểm tra nếu buffer đã đầy, cấp phát thêm bộ nhớ
         if (strlen(buffer) + strlen(room_info) >= 1024)
@@ -840,20 +906,24 @@ int update_player_in_room(int roomId, int userId, int round, int money)
     }
 }
 
-int get_current_numbers(int roomId){
+int get_current_numbers(int roomId)
+{
     open_database();
     const char *select_query = "SELECT numbers FROM rooms WHERE id = ?;";
     sqlite3_stmt *stmt;
     int numbers = 0;
 
-    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK){
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
         sqlite3_bind_int(stmt, 1, roomId);
-        if (sqlite3_step(stmt) == SQLITE_ROW){
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
             numbers = sqlite3_column_int(stmt, 0);
         }
         sqlite3_finalize(stmt);
     }
-    else{
+    else
+    {
         fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
     }
 
@@ -895,22 +965,26 @@ void display_ranking_round_by_roomId(int roomId)
     close_database(); // Đóng cơ sở dữ liệu
 }
 
-int get_current_money(int roomId, int userId, int round){
+int get_current_money(int roomId, int userId, int round)
+{
     open_database();
     const char *select_query = "SELECT money FROM ranking_round WHERE roomId = ? AND userId = ? AND round = ?;";
     sqlite3_stmt *stmt;
     int money = 0;
 
-    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK){
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
         sqlite3_bind_int(stmt, 1, roomId);
         sqlite3_bind_int(stmt, 2, userId);
         sqlite3_bind_int(stmt, 3, round);
-        if (sqlite3_step(stmt) == SQLITE_ROW){
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
             money = sqlite3_column_int(stmt, 0);
         }
         sqlite3_finalize(stmt);
     }
-    else{
+    else
+    {
         fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
     }
 

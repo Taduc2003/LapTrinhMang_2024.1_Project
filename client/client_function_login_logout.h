@@ -56,7 +56,9 @@ void register_user(int sockfd)
                 printf("2. Quay lại menu chính\n");
                 int retry_choice;
                 scanf("%d", &retry_choice);
-
+                int c;
+                while ((c = getchar()) != '\n' && c != EOF)
+                    ;
                 if (retry_choice == 2)
                 { // Quay lại menu chính
                     break;
@@ -107,7 +109,9 @@ void login_user(int sockfd)
                 printf("2. Quay lại menu chính\n");
                 int retry_choice;
                 scanf("%d", &retry_choice);
-
+                int c;
+                while ((c = getchar()) != '\n' && c != EOF)
+                    ;
                 if (retry_choice == 2)
                 { // Quay lại menu chính
                     break;
