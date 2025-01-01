@@ -111,13 +111,78 @@ int process_join_room(char *room_id, int connfd, char *user_id)
     int currentNumbers = get_current_numbers(atoi(room_id)); // Hàm này cần được định nghĩa để lấy số lượng hiện tại
     update_room_status(atoi(room_id), status, currentNumbers + 1);
 
-    if(get_current_numbers(atoi(room_id)) == 3){
+    if (get_current_numbers(atoi(room_id)) == 3)
+    {
         update_room_status(atoi(room_id), 1, 3);
     }
     // // Cập nhật thông tin người chơi vào phòng
     // update_player_in_room(atoi(room_id), atoi(user_id), 1, 0); // Giả sử round = 1 và money = 0
 
     return status;
+}
+void handle_view_room_info_request(char *data, int connfd)
+{
+    printf("Server nhận yêu cầu VIEW_ROOM_INFO_REQ\n");
+    char room_id[10] = {0};
+
+    // Trích xuất room_id từ data
+    if (sscanf(data, "%9s", room_id) != 1)
+    {
+        send_message("VIEW_ROOM_INFO_RES", "Invalid data format", connfd);
+        return;
+    }
+
+    printf("Xử lý hiển thị thông tin phòng với ID phòng: %s\n", room_id);
+
+    // Lấy thông tin người chơi trong phòng từ cơ sở dữ liệu
+    char *player_info = get_players_in_room(atoi(room_id));
+    if (player_info != NULL)
+    {
+        // Gửi danh sách người chơi về client
+        send_message("VIEW_ROOM_INFO_RES", player_info, connfd);
+        free(player_info); // Giải phóng bộ nhớ đã cấp phát
+    }
+    else
+    {
+        send_message("VIEW_ROOM_INFO_RES", "Không có thông tin phòng hoặc phòng không tồn tại.", connfd);
+    }
+}
+
+void handle_leave_room_request(char *data, int connfd)
+{
+    printf("Server nhận yêu cầu LEAVE_ROOM_REQ\n");
+    char room_id[10] = {0};
+    char user_id[10] = {0};
+
+    // Trích xuất room_id và user_id từ data
+    if (sscanf(data, "%9s %9s", room_id, user_id) != 2)
+    {
+        send_message("LEAVE_ROOM_RES", "Invalid data format", connfd);
+        return;
+    }
+
+    printf("Xử lý thoát phòng với ID phòng: %s, ID người dùng: %s\n", room_id, user_id);
+
+    // Giảm số lượng người chơi trong phòng
+    int currentNumbers = get_current_numbers(atoi(room_id));
+    if (currentNumbers > 0)
+    {
+        update_room_status(atoi(room_id), 0, currentNumbers - 1);
+        send_message("LEAVE_ROOM_RES", "0", connfd); // Phản hồi thành công
+        printf("Người chơi đã thoát phòng. Số lượng người chơi hiện tại: %d\n", currentNumbers - 1);
+
+        // Nếu phòng không còn người chơi, cập nhật trạng thái phòng
+        if (currentNumbers - 1 == 0)
+        {
+            printf("Phòng %s không còn người chơi. Cập nhật trạng thái phòng.\n", room_id);
+            update_room_status(atoi(room_id), 2, 0); // Đặt trạng thái phòng là "Đã bị hủy"
+        }
+    }
+    else
+    {
+        send_message("LEAVE_ROOM_RES", "1", connfd); // Phản hồi lỗi: không thể thoát phòng
+        printf("Không thể thoát phòng. Phòng trống hoặc không hợp lệ.\n");
+    }
 }
 
 #endif // SERVER_FUNCTION_ROOM_H

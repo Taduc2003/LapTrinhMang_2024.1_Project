@@ -28,14 +28,14 @@ void send_message(char *header, char *data, int connfd)
 
 void process_message(char *msg, int n, int connfd)
 {
-    msg[n] = '\0';                        // Đảm bảo chuỗi null-terminated
+    msg[n] = '\0';                       // Đảm bảo chuỗi null-terminated
     printf("Server đã nhận: %s\n", msg); // Debug thông điệp nhận
 
     char header[MAXLINE] = {0};
     char data[MAXLINE] = {0};
 
     static int game_requests = 0; // số lượng yêu cầu vào game
-    static Player *player[3]; // Mảng chứa các kết nối của người chơi
+    static Player *player[3];     // Mảng chứa các kết nối của người chơi
 
     // Tách HEADER và DATA
     char *header_start = strstr(msg, "HEADER: ");
@@ -99,8 +99,17 @@ void process_message(char *msg, int n, int connfd)
     {
         handle_join_room_request(data, connfd);
     }
+    else if (strcmp(header, "LEAVE_ROOM_REQ") == 0)
+    {
+        handle_leave_room_request(data, connfd);
+    }
+    else if (strcmp(header, "VIEW_ROOM_INFO_REQ") == 0)
+    {
+        handle_view_room_info_request(data, connfd);
+    }
+
     else if (strcmp(header, "JOIN_GAME") == 0)
-    {   
+    {
         // Tách user_id và room_id từ data
         char user_id[10];
         char room_id[10];
@@ -111,24 +120,25 @@ void process_message(char *msg, int n, int connfd)
         player[game_requests]->room_id = atoi(room_id);
         printf("Player %d joined with connection %d\n", game_requests + 1, connfd);
         game_requests++;
-        
 
         if (game_requests == 3)
         {
-            printf("Starting game with connections: %d, %d, %d\n", 
+            printf("Starting game with connections: %d, %d, %d\n",
                    player[0]->connfd, player[1]->connfd, player[2]->connfd);
-            
+
             // Notify all players that game is starting
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 3; i++)
+            {
                 send(player[i]->connfd, "GAME_START", strlen("GAME_START"), 0);
             }
-            
+
             // Start the game
             handle_game(player);
-            
+
             // Reset for next game
             game_requests = 0;
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 3; i++)
+            {
                 free(player[i]);
                 player[i] = NULL;
             }
