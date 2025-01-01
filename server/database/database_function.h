@@ -65,6 +65,8 @@ void mark_user_as_logged_in(const char *username);
 void display_users_table();
 void display_all_accounts();
 void mask_user_password(char *password);
+void update_user_status(const char *username, int status);
+int check_user_status(const char *username);
 char *get_username_by_id(int id);
 void get_all_user_table();
 
@@ -1053,7 +1055,8 @@ void display_all_accounts()
     close_database(); // Đóng cơ sở dữ liệu
 }
 
-int get_current_money(int roomId, int userId, int round){
+int get_current_money(int roomId, int userId, int round)
+{
     open_database();
     const char *select_query = "SELECT money FROM ranking_round WHERE roomId = ? AND userId = ? AND round = ?;";
     sqlite3_stmt *stmt;
@@ -1078,3 +1081,80 @@ int get_current_money(int roomId, int userId, int round){
     close_database();
     return money;
 }
+
+void update_user_status(const char *username, int status)
+{
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *update_query = "UPDATE users SET status = ? WHERE username = ?;"; // Truy vấn cập nhật
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, update_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, status);
+        sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't update user status: %s\n", sqlite3_errmsg(db));
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
+}
+
+int check_user_status(const char *username)
+{
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *select_query = "SELECT status FROM users WHERE username = ?;"; // Truy vấn dữ liệu
+    sqlite3_stmt *stmt;
+    int status = -1; // Khởi tạo trạng thái
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            status = sqlite3_column_int(stmt, 0); // Lấy trạng thái
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
+    return status;    // Trả về trạng thái
+}
+
+void update_all_user_status(int status)
+{
+    open_database(); // Mở cơ sở dữ liệu
+
+    const char *update_query = "UPDATE users SET status = ?;"; // Truy vấn cập nhật
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, update_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, status);
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't update user status: %s\n", sqlite3_errmsg(db));
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database(); // Đóng cơ sở dữ liệu
+}
+
+

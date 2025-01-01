@@ -150,7 +150,6 @@ void menu_user(int sockfd)
             create_room(sockfd);
             break;
         case 2:
-
             printf("Nhập ID phòng để tham gia: ");
             scanf("%s", room_id);
             join_room(sockfd, room_id, user_id);
@@ -159,8 +158,14 @@ void menu_user(int sockfd)
             view_all_rooms(sockfd);
             break;
         case 4:
-            printf("Logging out...\n");
-            return;
+            // Gửi yêu cầu đăng xuất đến server
+            {
+                char message[MAXLINE];
+                sprintf(message, "HEADER: LOGOUT_REQ; DATA: username: %s", user_id); // Giả định user_id chứa tên người dùng
+                send(sockfd, message, strlen(message), 0);                           // Gửi yêu cầu đăng xuất
+                printf("Logging out...\n");
+                return; // Thoát khỏi menu
+            }
         default:
             printf("Lựa chọn không hợp lệ. Vui lòng thử lại.\n");
         }

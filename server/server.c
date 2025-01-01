@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h> // Include errno.h
+#include <time.h>
 
 #include "./database/database_function.h"
 #include "./server_function.h"
@@ -16,8 +17,13 @@
 
 char user_id[MAXLINE]; // Định nghĩa biến user_id
 
+// Định nghĩa mảng clients_info
+ClientInfo clients_info[MAX_CLIENTS]; // Mảng chứa thông tin người dùng
+
 int main(int argc, char **argv)
 {
+    signal(SIGINT, handle_signal);  // Xử lý Ctrl+C
+    signal(SIGTERM, handle_signal); // Xử lý tín hiệu dừng
     int listenfd, n;
     int clients[MAX_CLIENTS]; // Array to hold client sockets
     fd_set readfds;           // Set of socket descriptors
@@ -101,7 +107,7 @@ int main(int argc, char **argv)
             perror("select error");
             continue;
         }
-
+        handle_reconnection(new_socket, user_id);
         // If something happened on the listen socket, then it's an incoming connection
         if (FD_ISSET(listenfd, &readfds))
         {
@@ -136,9 +142,21 @@ int main(int argc, char **argv)
                 // Check if it was for closing, and also read the incoming message
                 if ((n = recv(sd, buf, MAXLINE, 0)) == 0)
                 {
-                    // Somebody disconnected, get his details and print
+                    // Somebody disconnected
                     getpeername(sd, (struct sockaddr *)&cliaddr, &clilen);
                     printf("Host disconnected, ip %s, port %d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+
+                    // Cập nhật trạng thái người dùng về 0
+                    const char *username = get_username_from_connfd(sd); // Lấy tên người dùng từ connfd
+                    if (username != NULL)
+                    {
+                        update_user_status(username, 0); // Đặt trạng thái là 0
+                        printf("User %s status updated to 0 (disconnected).\n", username);
+                    }
+                    else
+                    {
+                        printf("Could not retrieve username for disconnected client.\n");
+                    }
 
                     // Close the socket and mark as 0 in list for reuse
                     close(sd);
@@ -158,6 +176,14 @@ int main(int argc, char **argv)
                     process_message(buf, n, sd);
                 }
             }
+        }
+
+        // Gửi heartbeat đến các client mỗi 5 giây
+        static time_t last_heartbeat = 0;
+        if (time(NULL) - last_heartbeat >= 5)
+        {
+            send_heartbeat_to_clients(clients, MAX_CLIENTS);
+            last_heartbeat = time(NULL);
         }
     }
 
