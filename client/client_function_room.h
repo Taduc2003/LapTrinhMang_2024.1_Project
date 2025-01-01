@@ -17,9 +17,6 @@ void create_room(int sockfd);
 void view_all_rooms(int sockfd);
 void join_room(int sockfd, char *room_id, char *user_id);
 
-
-
-
 void create_room(int sockfd)
 {
     char request[200];
@@ -97,7 +94,8 @@ void join_room(int sockfd, char *room_id, char *user_id)
                     {
                         join_game(sockfd, user_id, room_id);
                         return;
-                    }else if (choice == 3)
+                    }
+                    else if (choice == 3)
                     {
                         printf("Thoat phong\n");
                         return;
@@ -111,7 +109,8 @@ void join_room(int sockfd, char *room_id, char *user_id)
                 printf("2. Quay lại menu chính\n");
                 int retry_choice;
                 scanf("%d", &retry_choice);
-
+                while ((retry_choice = getchar()) != '\n' && retry_choice != EOF)
+                    ;
                 if (retry_choice == 2)
                 { // Quay lại menu chính
                     break;

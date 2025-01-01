@@ -8,7 +8,7 @@
 #include "send_question_function.h"
 #include "server_function_login_logout.h"
 #include "server_function.h"
-
+#pragma once
 // Thêm khai báo hàm send_message
 void send_message(char *header, char *data, int connfd);
 
@@ -111,7 +111,8 @@ int process_join_room(char *room_id, int connfd, char *user_id)
     int currentNumbers = get_current_numbers(atoi(room_id)); // Hàm này cần được định nghĩa để lấy số lượng hiện tại
     update_room_status(atoi(room_id), status, currentNumbers + 1);
 
-    if(get_current_numbers(atoi(room_id)) == 3){
+    if (get_current_numbers(atoi(room_id)) == 3)
+    {
         update_room_status(atoi(room_id), 1, 3);
     }
     // // Cập nhật thông tin người chơi vào phòng

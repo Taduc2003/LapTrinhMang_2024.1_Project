@@ -20,14 +20,15 @@ int main(int argc, char **argv)
 {
     int listenfd, n;
     int clients[MAX_CLIENTS]; // Array to hold client sockets
-    fd_set readfds; // Set of socket descriptors
+    fd_set readfds;           // Set of socket descriptors
     int max_sd, sd, activity, new_socket;
     struct sockaddr_in cliaddr, servaddr;
     socklen_t clilen = sizeof(cliaddr); // Initialize clilen
     char buf[MAXLINE];
 
     // Initialize all client sockets to 0
-    for (int i = 0; i < MAX_CLIENTS; i++) {
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
         clients[i] = 0;
     }
 
@@ -65,7 +66,8 @@ int main(int argc, char **argv)
     printf("Server running on port %d...waiting for connections.\n", SERV_PORT);
 
     // Main loop
-    for (;;) {
+    for (;;)
+    {
         // Clear the socket set
         FD_ZERO(&readfds);
 
@@ -74,16 +76,19 @@ int main(int argc, char **argv)
         max_sd = listenfd;
 
         // Add child sockets to set
-        for (int i = 0; i < MAX_CLIENTS; i++) {
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
             sd = clients[i];
 
             // If valid socket descriptor then add to read list
-            if (sd > 0) {
+            if (sd > 0)
+            {
                 FD_SET(sd, &readfds);
             }
 
             // Highest file descriptor number, needed for the select function
-            if (sd > max_sd) {
+            if (sd > max_sd)
+            {
                 max_sd = sd;
             }
         }
@@ -91,15 +96,18 @@ int main(int argc, char **argv)
         // Wait for an activity on one of the sockets
         activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
 
-        if ((activity < 0) && (errno != EINTR)) {
+        if ((activity < 0) && (errno != EINTR))
+        {
             perror("select error");
             continue;
         }
 
         // If something happened on the listen socket, then it's an incoming connection
-        if (FD_ISSET(listenfd, &readfds)) {
+        if (FD_ISSET(listenfd, &readfds))
+        {
             clilen = sizeof(cliaddr); // Initialize clilen before accept
-            if ((new_socket = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0) {
+            if ((new_socket = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0)
+            {
                 perror("Accept failed");
                 continue;
             }
@@ -107,8 +115,10 @@ int main(int argc, char **argv)
             printf("New connection, socket fd is %d, ip is : %s, port : %d\n", new_socket, inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
 
             // Add new socket to array of sockets
-            for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (clients[i] == 0) {
+            for (int i = 0; i < MAX_CLIENTS; i++)
+            {
+                if (clients[i] == 0)
+                {
                     clients[i] = new_socket;
                     printf("Adding to list of sockets as %d\n", i);
                     break;
@@ -117,12 +127,15 @@ int main(int argc, char **argv)
         }
 
         // Else it's some IO operation on some other socket
-        for (int i = 0; i < MAX_CLIENTS; i++) {
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
             sd = clients[i];
 
-            if (FD_ISSET(sd, &readfds)) {
+            if (FD_ISSET(sd, &readfds))
+            {
                 // Check if it was for closing, and also read the incoming message
-                if ((n = recv(sd, buf, MAXLINE, 0)) == 0) {
+                if ((n = recv(sd, buf, MAXLINE, 0)) == 0)
+                {
                     // Somebody disconnected, get his details and print
                     getpeername(sd, (struct sockaddr *)&cliaddr, &clilen);
                     printf("Host disconnected, ip %s, port %d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
@@ -130,11 +143,15 @@ int main(int argc, char **argv)
                     // Close the socket and mark as 0 in list for reuse
                     close(sd);
                     clients[i] = 0;
-                } else if (n < 0) {
+                }
+                else if (n < 0)
+                {
                     perror("recv error");
                     close(sd);
                     clients[i] = 0;
-                } else {
+                }
+                else
+                {
                     // Process the message
                     buf[n] = '\0'; // Null-terminate the received data
                     printf("Received message: %s\n", buf);
