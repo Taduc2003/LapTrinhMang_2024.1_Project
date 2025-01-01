@@ -110,6 +110,7 @@ int process_join_room(char *room_id, int connfd, char *user_id)
     // Cập nhật số lượng người trong phòng
     int currentNumbers = get_current_numbers(atoi(room_id)); // Hàm này cần được định nghĩa để lấy số lượng hiện tại
     update_room_status(atoi(room_id), status, currentNumbers + 1);
+    insert_users_rooms_table(atoi(room_id), atoi(user_id));
 
     if (get_current_numbers(atoi(room_id)) == 3)
     {
@@ -168,6 +169,7 @@ void handle_leave_room_request(char *data, int connfd)
     if (currentNumbers > 0)
     {
         update_room_status(atoi(room_id), 0, currentNumbers - 1);
+        delete_users_rooms_table(atoi(room_id), atoi(user_id));
         send_message("LEAVE_ROOM_RES", "0", connfd); // Phản hồi thành công
         printf("Người chơi đã thoát phòng. Số lượng người chơi hiện tại: %d\n", currentNumbers - 1);
 

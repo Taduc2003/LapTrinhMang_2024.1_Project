@@ -94,12 +94,12 @@ int main()
     // create_rooms_table();
     // create_ranking_round_table();
 
-    // insert_users_table("user1", "u1");
-    // insert_users_table("user2", "u2");
-    // insert_users_table("user3", "u3");
+    // insert_users_table("user1@", "U1#");
+    // insert_users_table("user2@", "U2#");
+    // insert_users_table("user3@", "U3#");
     // insert_sample_questions(); // Thêm câu hỏi
     //---------------------------------------
-    test_get_players_in_room();
-
+    // test_get_players_in_room();
+    // get_all_user_table();
     return 0;
 }
