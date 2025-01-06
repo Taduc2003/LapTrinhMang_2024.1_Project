@@ -34,7 +34,7 @@ int is_valid_password(const char *password)
 
     return has_upper && has_digit && has_special; // Trả về 1 nếu đủ điều kiện, 0 nếu không
 }
-
+void trim_whitespace(char *str);
 int display_welcome_menu()
 {
     printf("---------------WELCOME TO DUNG DE TIEN ROI---------------\n");

@@ -177,15 +177,18 @@ void handle_game(Player *players[3])
     int current_money[3];
 
     // Thông báo bắt đầu game
-    strcpy(buffer, "START_GAME");
     for (int i = 0; i < 3; i++)
     {
+        memset(buffer, 0, sizeof(buffer));
+        char message[MAXLINE]; // Biến tạm để lưu thông điệp
+        snprintf(message, MAXLINE, "GAME_START\n");
         insert_ranking_round_table(players[i]->room_id, players[i]->user_id, 0, INITIAL_POINTS);
-        if (send(players[i]->connfd, buffer, strlen(buffer), 0) == -1)
+        if (send(players[i]->connfd, message, strlen(message), 0) == -1)
         {
             perror("Error sending start message");
             return;
         }
+        usleep(1500000);
     }
 
     int active_players = 3;
@@ -312,14 +315,21 @@ void handle_game(Player *players[3])
                 }
             }
 
-            // timeout.tv_sec = TIMEOUT_SECONDS;
-            // timeout.tv_usec = 0;
+            // Thêm timeout cho select
+            struct timeval timeout;
+            timeout.tv_sec = TIMEOUT_SECONDS; // Thay đổi thời gian timeout nếu cần
+            timeout.tv_usec = 0;
 
-            int activity = select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
+            int activity = select(FD_SETSIZE, &readfds, NULL, NULL, &timeout);
             if (activity < 0)
             {
                 perror("select error");
                 break;
+            }
+            else if (activity == 0)
+            {
+                printf("Timeout: Không có phản hồi từ người chơi.\n");
+                break; // Thoát vòng lặp nếu timeout
             }
 
             for (int i = 0; i < 3; i++)
