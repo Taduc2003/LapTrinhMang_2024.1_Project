@@ -24,23 +24,28 @@ void handle_logout_request(char *data, int connfd)
     char userid[50] = {0};
 
     // Trích xuất userid từ data
-    if (sscanf(data, "userid: %49s", userid) != 1)
+    if (sscanf(data, "user_id: %49s", userid) != 1)
     {
         send_message("LOGOUT_RES", "Invalid data format", connfd);
         return;
     }
 
     // Tìm username theo userid từ database
-    char *username = get_username_from_database(userid);
-    if (username == NULL)
-    {
-        send_message("LOGOUT_RES", "User not found", connfd);
-        return;
-    }
-
-    // Cập nhật trạng thái của tài khoản về 0 (không đăng nhập)
+    
+    char username[50];
+    strcpy(username,get_username_from_database(atoi(userid)));
+    printf("Username: %s\n", username);
+   
     update_user_status(username, 0);
-
+        // Kiểm tra xem socket này đã được ánh xạ với tài khoản khác chưa
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients_status[i].socket == connfd && clients_status[i].is_logged_in)
+        {
+            clients_status[i].is_logged_in = 0;
+            clients_status[i].username[0] = '\0';
+        }
+    }
     // Gửi thông báo về client rằng đã đăng xuất thành công
     send_message("LOGOUT_RES", "Logged out successfully", connfd);
 }
@@ -71,6 +76,9 @@ void handle_login_request(char *data, int connfd)
     {
         if (clients_status[i].socket == connfd && clients_status[i].is_logged_in)
         {
+            printf("Socket %d is already in use\n", connfd);
+            printf("Username: %s\n", clients_status[i].username);
+            printf("status: %d\n", clients_status[i].is_logged_in);
             send_message("LOGIN_RES", "Socket already in use", connfd);
             return;
         }
@@ -86,7 +94,7 @@ void handle_login_request(char *data, int connfd)
         // Cập nhật trạng thái cho socket
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
-            if (clients_status[i].socket == 0)
+            if (clients_status[i].socket == 0 || clients_status[i].socket == connfd)
             {
                 clients_status[i].socket = connfd;
                 strncpy(clients_status[i].username, username, sizeof(clients_status[i].username));

@@ -85,7 +85,7 @@ int get_current_money(int roomId, int userId, int round);
 int insert_users_rooms_table(int userId, int roomId);
 int delete_users_rooms_table(int userId, int roomId);
 
-char *get_username_from_database(const char *userid);
+char *get_username_from_database(const int userid);
 
 void create_users_table()
 {
@@ -1227,20 +1227,33 @@ int get_user_status(const char *username) {
     return status;
 }
 
-char *get_username_from_database(const char *userid) {
+char *get_username_from_database(const int userid) {
     open_database();
     const char *select_query = "SELECT username FROM users WHERE id = ?;";
     sqlite3_stmt *stmt;
-    char *username = NULL;
+    char *username = malloc(128); // Allocate memory for username
+
+    if (!username) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        close_database();
+        return NULL;
+    }
 
     if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK) {
-        sqlite3_bind_text(stmt, 1, userid, -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 1, userid); // Use bind_int for integer parameter
 
         if (sqlite3_step(stmt) == SQLITE_ROW) {
-            username = (char *)sqlite3_column_text(stmt, 0);
+            const char *temp = (const char *)sqlite3_column_text(stmt, 0);
+            strncpy(username, temp, 127);
+            username[127] = '\0'; // Ensure null termination
+        } else {
+            free(username);
+            username = NULL;
         }
     } else {
         fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        free(username);
+        username = NULL;
     }
 
     sqlite3_finalize(stmt);
