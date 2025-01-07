@@ -87,6 +87,32 @@ int insert_ranking_round_table(int roomId, int userId, int round, int money);
 Ranking *search_rankings_by_roomId_round(int roomId, int round);
 int get_current_money(int roomId, int userId, int round);
 
+void create_users_rooms_table()
+{
+    // Định nghĩa logic để tạo bảng người dùng trong phòng
+}
+
+void delete_users_rooms_table(int room_id, int user_id)
+{
+    // Định nghĩa logic để xóa người dùng khỏi phòng
+}
+
+char *get_username_by_id(int user_id)
+{
+    // Định nghĩa logic để lấy tên người dùng theo ID
+    return "username"; // Ví dụ trả về tên người dùng
+}
+
+void insert_users_rooms_table(int room_id, int user_id)
+{
+    // Định nghĩa logic để thêm người dùng vào phòng
+}
+
+void mark_user_as_logged_out(const char *username)
+{
+    // Định nghĩa logic để đánh dấu người dùng đã đăng xuất
+}
+
 void create_users_table()
 {
     open_database();

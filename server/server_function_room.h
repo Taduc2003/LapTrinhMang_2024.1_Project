@@ -11,7 +11,10 @@
 
 // Thêm khai báo hàm send_message
 void send_message(char *header, char *data, int connfd);
-
+// ... existing code ...
+void insert_users_rooms_table(int room_id, int user_id); // Thêm khai báo hàm này
+void delete_users_rooms_table(int room_id, int user_id); // Thêm khai báo hàm này
+// ... existing code ...
 // Định nghĩa hằng số
 #define MAXLINE 4096
 

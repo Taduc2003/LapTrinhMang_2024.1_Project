@@ -38,6 +38,8 @@ const char *get_username_from_connfd(int connfd);
 // Hàm xử lý yêu cầu đăng ký
 void handle_register_request(char *data, int connfd);
 
+void mark_user_as_logged_out(const char *username); // Thêm khai báo hàm này
+
 void handle_login_request(char *data, int connfd)
 {
     char username[50] = {0};
