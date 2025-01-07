@@ -61,6 +61,9 @@ int insert_users_table(char *username, char *password);
 int check_login(char *username, char *password);
 char *get_username_by_id(int id);
 void get_all_user_table();
+int update_all_user_status();
+void update_user_status(const char *username, int status);
+int get_user_status(const char *username);
 
 void create_questions_table();
 int insert_questions_table(char *content, char *ans1, char *ans2, char *ans3, int correctAns, int level);
@@ -81,6 +84,8 @@ int get_current_money(int roomId, int userId, int round);
 
 int insert_users_rooms_table(int userId, int roomId);
 int delete_users_rooms_table(int userId, int roomId);
+
+char *get_username_from_database(const char *userid);
 
 void create_users_table()
 {
@@ -1140,4 +1145,105 @@ int delete_users_rooms_table(int roomId, int userId)
     // return state
     // 0 = success
     // 1 = fail
+}
+
+int update_all_users_status()
+{
+    open_database();
+    const char *update_query = "UPDATE users SET status = 0;";
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, update_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't update data: %s\n", sqlite3_errmsg(db));
+        }
+        else
+        {
+            printf("User status updated successfully.\n");
+        }
+
+        sqlite3_finalize(stmt);
+        return 0;
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        return 1;
+    }
+    close_database();
+    // return state
+    // 0 = success
+    // 1 = fail
+}
+void update_user_status(const char *username, int status)
+{
+    open_database();
+    const char *update_query = "UPDATE users SET status = ? WHERE username = ?;";
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, update_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, status);
+        sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
+            fprintf(stderr, "Error: Can't update data: %s\n", sqlite3_errmsg(db));
+        }
+        else
+        {
+            printf("User status updated successfully.\n");
+        }
+
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+    close_database();
+}
+
+int get_user_status(const char *username) {
+    open_database();
+    const char *select_query = "SELECT status FROM users WHERE username = ?;";
+    sqlite3_stmt *stmt;
+    int status = 0;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            status = sqlite3_column_int(stmt, 0);
+        }
+    } else {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    sqlite3_finalize(stmt);
+    close_database();
+    return status;
+}
+
+char *get_username_from_database(const char *userid) {
+    open_database();
+    const char *select_query = "SELECT username FROM users WHERE id = ?;";
+    sqlite3_stmt *stmt;
+    char *username = NULL;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, userid, -1, SQLITE_STATIC);
+
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            username = (char *)sqlite3_column_text(stmt, 0);
+        }
+    } else {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    sqlite3_finalize(stmt);
+    close_database();
+    return username;
 }
