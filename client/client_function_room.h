@@ -9,6 +9,7 @@
 #include "client_function.h"
 #include "client_function_game.h"
 #include "menu.h"
+#include "client_function_game_2.h"
 #define MAXLINE 4096
 
 char user_id[MAXLINE];
@@ -105,7 +106,8 @@ void join_room(int sockfd, char *room_id, char *user_id)
                     }
                     else if (choice == 2)
                     {
-                        join_game(sockfd, user_id, room_id);
+                        //join_game(sockfd, user_id, room_id);
+                        handle_join_game(sockfd, user_id, room_id);
                         return;
                     }
                     else if (choice == 3)

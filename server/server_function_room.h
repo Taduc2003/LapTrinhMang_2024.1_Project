@@ -187,4 +187,3 @@ void handle_leave_room_request(char *data, int connfd)
     }
 }
 
-#endif // SERVER_FUNCTION_ROOM_H
