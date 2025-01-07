@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include "client_function.h"
 #include "menu.h"
-
+#include "client_function_game_2.h"
 #define MAXLINE 4096
 
 char user_id[MAXLINE];
@@ -17,7 +17,7 @@ void process_message(char *msg, int n);
 void display_data(const char *data);
 void trim_whitespace(char *str);
 
-void process_message(char *msg, int n)
+void process_message(char *msg, int n, int sockfd)
 {
     msg[n] = '\0';                                       // Đảm bảo thông điệp là chuỗi null-terminated
     printf("Processing message from server: %s\n", msg); // Có thể giữ lại dòng này cho debug
@@ -131,6 +131,39 @@ void process_message(char *msg, int n)
         }
         return;
     }
+
+    if (strcmp(header, "WAITING_FOR_PLAYERS") == 0)
+    {
+        printf("Đang chờ người chơi khác tham gia...\n");
+        return;
+    }
+
+    if (strcmp(header, "GAME_START") == 0)
+    {
+        printf("Game đã bắt đầu!\n");
+        return;
+    }
+
+    if (strcmp(header, "QUESTION") == 0)
+    {
+        handle_question(sockfd, data);
+        return;
+    }
+
+    if (strcmp(header, "KQ") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    if (strcmp(header, "OVER_MONEY") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    printf("Phản hồi không xác định từ server.\n");
+    // Xử lý các phản hồi khác nếu cần
 }
 
 void send_message(char *header, char *data, int sockfd)

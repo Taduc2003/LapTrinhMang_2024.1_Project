@@ -8,6 +8,7 @@
 #include "send_question_function.h"
 #include "server_function_login_logout.h"
 #include "server_function_room.h"
+#include "server_function_game_2.h"
 // Định nghĩa hằng số
 #define MAXLINE 4096
 extern char user_id[MAXLINE]; // Khai báo biến user_id
@@ -111,42 +112,44 @@ void process_message(char *msg, int n, int connfd)
     else if (strcmp(header, "JOIN_GAME") == 0)
     {
         // Tách user_id và room_id từ data
-        char user_id[10];
-        char room_id[10];
-        sscanf(data, "%s %s", user_id, room_id);
-        player[game_requests] = (Player *)malloc(sizeof(Player));
-        player[game_requests]->connfd = connfd;
-        player[game_requests]->user_id = atoi(user_id);
-        player[game_requests]->room_id = atoi(room_id);
-        printf("Player %d joined with connection %d\n", game_requests + 1, connfd);
-        game_requests++;
+        // char user_id[10];
+        // char room_id[10];
+        // sscanf(data, "%s %s", user_id, room_id);
+        // player[game_requests] = (Player *)malloc(sizeof(Player));
+        // player[game_requests]->connfd = connfd;
+        // player[game_requests]->user_id = atoi(user_id);
+        // player[game_requests]->room_id = atoi(room_id);
+        // printf("Player %d joined with connection %d\n", game_requests + 1, connfd);
+        // game_requests++;
 
-        if (game_requests == 3)
-        {
-            printf("Starting game with connections: %d, %d, %d\n",
-                   player[0]->connfd, player[1]->connfd, player[2]->connfd);
+        // if (game_requests == 3)
+        // {
+        //     printf("Starting game with connections: %d, %d, %d\n",
+        //            player[0]->connfd, player[1]->connfd, player[2]->connfd);
 
-            // Notify all players that game is starting
-            for (int i = 0; i < 3; i++)
-            {
-                send(player[i]->connfd, "GAME_START", strlen("GAME_START"), 0);
-            }
+        //     // Notify all players that game is starting
+        //     for (int i = 0; i < 3; i++)
+        //     {
+        //         send(player[i]->connfd, "GAME_START", strlen("GAME_START"), 0);
+        //     }
 
-            // Start the game
-            handle_game(player);
+        //     // Start the game
+        //     handle_game(player);
 
-            // Reset for next game
-            game_requests = 0;
-            for (int i = 0; i < 3; i++)
-            {
-                free(player[i]);
-                player[i] = NULL;
-            }
-        }
-        else
-        {
-            send(connfd, "WAITING_FOR_PLAYERS", strlen("WAITING_FOR_PLAYERS"), 0);
-        }
+        //     // Reset for next game
+        //     game_requests = 0;
+        //     printf("Game ended. Resetting game requests = %d\n", game_requests);
+        //     for (int i = 0; i < 3; i++)
+        //     {
+        //         free(player[i]);
+        //         player[i] = NULL;
+        //     }
+        // }
+        // else
+        // {
+        //     send(connfd, "WAITING_FOR_PLAYERS", strlen("WAITING_FOR_PLAYERS"), 0);
+        // }
+        handle_join_game_request(data, connfd);
     }
     else
     {
