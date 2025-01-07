@@ -5,162 +5,207 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h> // Include errno.h
-
+#include <errno.h>
+#include <arpa/inet.h> // Include inet_ntoa
 #include "./database/database_function.h"
 #include "./server_function.h"
-#define MAXLINE 4096   /*max text line length*/
-#define SERV_PORT 3000 /*port*/
-#define LISTENQ 8      /*maximum number of client connections */
-#define MAX_CLIENTS 30 // Maximum number of clients
+#include "./server.h"
 
-char user_id[MAXLINE]; // Định nghĩa biến user_id
+#define MAXLINE 4096   /* max text line length */
+#define SERV_PORT 3000 /* port */
+#define LISTENQ 8      /* maximum number of client connections */
+// ... existing code ...
+#define MAX_CLIENTS 30
+
+char user_id[MAXLINE];                    // Define user_id variable
+ClientStatus clients_status[MAX_CLIENTS]; // Định nghĩa biến clients_status
+
+void manage_sockets(int listenfd, int *clients, fd_set *readfds);
 
 int main(int argc, char **argv)
 {
-    int listenfd, n;
-    int clients[MAX_CLIENTS]; // Array to hold client sockets
-    fd_set readfds;           // Set of socket descriptors
-    int max_sd, sd, activity, new_socket;
-    struct sockaddr_in cliaddr, servaddr;
-    socklen_t clilen = sizeof(cliaddr); // Initialize clilen
-    char buf[MAXLINE];
-
-    // Initialize all client sockets to 0
+    int listenfd;
+    int clients[MAX_CLIENTS] = {0}; // Array to hold client sockets
+    fd_set readfds;                 // Set of socket descriptors
+    struct sockaddr_in servaddr;
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        clients[i] = 0;
+        clients_status[i].socket = 0;
+        clients_status[i].is_logged_in = 0;
+        clients_status[i].username[0] = '\0';
     }
 
+    // Open and initialize the database
     open_database();
     initialize_database();
-
-    // Tạo socket
+    update_all_users_status();
+    // Create a socket
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Socket creation failed");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
-    // Định cấu hình địa chỉ server
+    // Configure server address
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(SERV_PORT);
 
-    // Bind socket
+    // Bind the socket
     if (bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
         perror("Bind failed");
         close(listenfd);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
-    // Listen
+    // Listen for connections
     if (listen(listenfd, LISTENQ) < 0)
     {
         perror("Listen failed");
         close(listenfd);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     printf("Server running on port %d...waiting for connections.\n", SERV_PORT);
 
-    // Main loop
-    for (;;)
+    // Main loop to manage sockets
+    while (1)
     {
-        // Clear the socket set
-        FD_ZERO(&readfds);
-
-        // Add listen socket to set
-        FD_SET(listenfd, &readfds);
-        max_sd = listenfd;
-
-        // Add child sockets to set
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            sd = clients[i];
-
-            // If valid socket descriptor then add to read list
-            if (sd > 0)
-            {
-                FD_SET(sd, &readfds);
-            }
-
-            // Highest file descriptor number, needed for the select function
-            if (sd > max_sd)
-            {
-                max_sd = sd;
-            }
-        }
-
-        // Wait for an activity on one of the sockets
-        activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
-
-        if ((activity < 0) && (errno != EINTR))
-        {
-            perror("select error");
-            continue;
-        }
-
-        // If something happened on the listen socket, then it's an incoming connection
-        if (FD_ISSET(listenfd, &readfds))
-        {
-            clilen = sizeof(cliaddr); // Initialize clilen before accept
-            if ((new_socket = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0)
-            {
-                perror("Accept failed");
-                continue;
-            }
-
-            printf("New connection, socket fd is %d, ip is : %s, port : %d\n", new_socket, inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
-
-            // Add new socket to array of sockets
-            for (int i = 0; i < MAX_CLIENTS; i++)
-            {
-                if (clients[i] == 0)
-                {
-                    clients[i] = new_socket;
-                    printf("Adding to list of sockets as %d\n", i);
-                    break;
-                }
-            }
-        }
-
-        // Else it's some IO operation on some other socket
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            sd = clients[i];
-
-            if (FD_ISSET(sd, &readfds))
-            {
-                // Check if it was for closing, and also read the incoming message
-                if ((n = recv(sd, buf, MAXLINE, 0)) == 0)
-                {
-                    // Somebody disconnected, get his details and print
-                    getpeername(sd, (struct sockaddr *)&cliaddr, &clilen);
-                    printf("Host disconnected, ip %s, port %d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
-
-                    // Close the socket and mark as 0 in list for reuse
-                    close(sd);
-                    clients[i] = 0;
-                }
-                else if (n < 0)
-                {
-                    perror("recv error");
-                    close(sd);
-                    clients[i] = 0;
-                }
-                else
-                {
-                    // Process the message
-                    buf[n] = '\0'; // Null-terminate the received data
-                    printf("Received message: %s\n", buf);
-                    process_message(buf, n, sd);
-                }
-            }
-        }
+        manage_sockets(listenfd, clients, &readfds);
     }
 
     close(listenfd);
     return 0;
+}
+
+// Function to manage sockets
+void manage_sockets(int listenfd, int *clients, fd_set *readfds)
+{
+    int max_sd = listenfd;      // Track the highest socket descriptor
+    struct sockaddr_in cliaddr; // Client address structure
+    socklen_t clilen = sizeof(cliaddr);
+    char buf[MAXLINE]; // Buffer for incoming messages
+
+    // Clear and prepare the socket set
+    FD_ZERO(readfds);
+    FD_SET(listenfd, readfds);
+
+    // Add active client sockets to the set
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        int sd = clients[i];
+        if (sd > 0)
+        {
+            FD_SET(sd, readfds);
+        }
+        if (sd > max_sd)
+        {
+            max_sd = sd;
+        }
+    }
+
+    // Wait for an activity on one of the sockets
+    int activity = select(max_sd + 1, readfds, NULL, NULL, NULL);
+    if ((activity < 0) && (errno != EINTR))
+    {
+        perror("select error");
+        return;
+    }
+
+    // Handle new connections
+    if (FD_ISSET(listenfd, readfds))
+    {
+        int new_socket = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen);
+        if (new_socket < 0)
+        {
+            perror("Accept failed");
+            return;
+        }
+
+        printf("New connection, socket fd: %d, IP: %s, Port: %d\n",
+               new_socket, inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+
+        // Add new socket to clients array
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (clients[i] == 0)
+            {
+                clients[i] = new_socket;
+                printf("Added to client list at position %d\n", i);
+                break;
+            }
+        }
+    }
+    printf("------- CÁC SOCKET ĐANG KẾT NỐI -----\n");
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients[i] > 0)
+        {
+            struct sockaddr_in peer_addr;
+            socklen_t peer_len = sizeof(peer_addr);
+
+            // Lấy thông tin IP và port của socket
+            if (getpeername(clients[i], (struct sockaddr *)&peer_addr, &peer_len) == 0)
+            {
+                printf("Socket %d, IP: %s, Port: %d\n",
+                       clients[i],
+                       inet_ntoa(peer_addr.sin_addr),
+                       ntohs(peer_addr.sin_port));
+            }
+            else
+            {
+                perror("getpeername error"); // In lỗi nếu không lấy được thông tin
+            }
+        }
+    }
+    printf("-------------------------------------\n");
+
+    // Handle IO operations for each client
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        int sd = clients[i];
+
+        if (FD_ISSET(sd, readfds))
+        {
+            int valread = recv(sd, buf, MAXLINE, 0);
+            if (valread == 0)
+            {
+                // Lấy thông tin tài khoản đăng nhập trên socket này
+                for (int i = 0; i < MAX_CLIENTS; i++)
+                {
+                    if (clients_status[i].socket == sd)
+                    {
+                        printf("User '%s' disconnected\n", clients_status[i].username);
+
+                        // Cập nhật trạng thái trong cơ sở dữ liệu
+                        update_user_status(clients_status[i].username, 0);
+
+                        // Xóa thông tin trạng thái
+                        clients_status[i].socket = 0;
+                        clients_status[i].is_logged_in = 0;
+                        clients_status[i].username[0] = '\0';
+                        break;
+                    }
+                }
+
+                // Đóng socket
+                close(sd);
+                clients[i] = 0;
+            }
+            else if (valread < 0)
+            {
+                perror("recv error");
+                close(sd);
+                clients[i] = 0; // Remove from clients list
+            }
+            else
+            {
+                // Process the received message
+                buf[valread] = '\0';
+                printf("Received message from socket %d: %s\n", sd, buf);
+                process_message(buf, valread, sd);
+            }
+        }
+    }
 }

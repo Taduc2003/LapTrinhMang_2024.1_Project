@@ -8,11 +8,48 @@
 #include "send_question_function.h"
 #include "server_function_room.h"
 #include "server_function.h"
+#include "server.h"
 // Định nghĩa hằng số
 #define MAXLINE 4096
 extern char user_id[MAXLINE]; // Khai báo biến user_id
-
+// ... existing code ...
+int get_user_status(const char *username); // Thêm khai báo hàm này
+// ... existing code ...
 void handle_login_request(char *data, int connfd);
+
+void handle_logout_request(char *data, int connfd);
+
+void handle_logout_request(char *data, int connfd)
+{
+    char userid[50] = {0};
+
+    // Trích xuất userid từ data
+    if (sscanf(data, "user_id: %49s", userid) != 1)
+    {
+        send_message("LOGOUT_RES", "Invalid data format", connfd);
+        return;
+    }
+
+    // Tìm username theo userid từ database
+    
+    char username[50];
+    strcpy(username,get_username_from_database(atoi(userid)));
+    printf("Username: %s\n", username);
+   
+    update_user_status(username, 0);
+        // Kiểm tra xem socket này đã được ánh xạ với tài khoản khác chưa
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients_status[i].socket == connfd && clients_status[i].is_logged_in)
+        {
+            clients_status[i].is_logged_in = 0;
+            clients_status[i].username[0] = '\0';
+        }
+    }
+    // Gửi thông báo về client rằng đã đăng xuất thành công
+    send_message("LOGOUT_RES", "Logged out successfully", connfd);
+}
+
 
 void handle_login_request(char *data, int connfd)
 {
@@ -26,10 +63,46 @@ void handle_login_request(char *data, int connfd)
         return;
     }
 
-    // Kiểm tra đăng nhập
+    // Kiểm tra trạng thái đăng nhập của tài khoản
+    int status = get_user_status(username); // Lấy trạng thái từ DB (1 = đang đăng nhập, 0 = chưa)
+    if (status == 1)
+    {
+        send_message("LOGIN_RES", "User already logged in", connfd);
+        return;
+    }
+
+    // Kiểm tra xem socket này đã được ánh xạ với tài khoản khác chưa
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients_status[i].socket == connfd && clients_status[i].is_logged_in)
+        {
+            printf("Socket %d is already in use\n", connfd);
+            printf("Username: %s\n", clients_status[i].username);
+            printf("status: %d\n", clients_status[i].is_logged_in);
+            send_message("LOGIN_RES", "Socket already in use", connfd);
+            return;
+        }
+    }
+
+    // Kiểm tra đăng nhập (username và password)
     int response = check_login(username, password);
     if (response >= 0)
     {
+        // Đánh dấu tài khoản này đang đăng nhập
+        update_user_status(username, 1); // Đặt trạng thái `status` = 1 trong DB
+
+        // Cập nhật trạng thái cho socket
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (clients_status[i].socket == 0 || clients_status[i].socket == connfd)
+            {
+                clients_status[i].socket = connfd;
+                strncpy(clients_status[i].username, username, sizeof(clients_status[i].username));
+                clients_status[i].is_logged_in = 1;
+                break;
+            }
+        }
+
         char resp_str[12];
         snprintf(resp_str, sizeof(resp_str), "%d", response);
         send_message("LOGIN_RES", resp_str, connfd);

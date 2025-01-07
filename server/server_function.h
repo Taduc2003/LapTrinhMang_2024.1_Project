@@ -83,6 +83,10 @@ void process_message(char *msg, int n, int connfd)
     {
         handle_login_request(data, connfd);
     }
+    else if (strcmp(header, "LOGOUT_REQ") == 0)
+    {
+        handle_logout_request(data, connfd);
+    }
     else if (strcmp(header, "REGISTER_REQ") == 0)
     {
         handle_register_request(data, connfd);

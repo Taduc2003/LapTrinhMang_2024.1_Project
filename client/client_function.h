@@ -131,6 +131,15 @@ void process_message(char *msg, int n)
         }
         return;
     }
+
+    if (strcmp(header, "LOGOUT_RES") == 0)
+    {
+        printf("Đăng xuất thành công.\n");
+    }
+    else
+    {
+        printf("Đăng xuất thất bại. Vui lòng thử lại.\n");
+    }
 }
 
 void send_message(char *header, char *data, int sockfd)

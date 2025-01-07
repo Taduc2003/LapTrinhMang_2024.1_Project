@@ -154,6 +154,13 @@ void menu_user(int sockfd)
             break;
         case 4:
             printf("Logging out...\n");
+            char logout_request[MAXLINE];
+            sprintf(logout_request, "user_id: %s", user_id);
+            send_message("LOGOUT_REQ", logout_request, sockfd);
+            char logout_response[MAXLINE];
+            int n = recv(sockfd, logout_response, MAXLINE, 0);
+            logout_response[n] = '\0'; // Đảm bảo kết thúc chuỗi hợp lệ
+            process_message(logout_response, strlen(logout_response));
             return;
         default:
             printf("Lựa chọn không hợp lệ. Vui lòng thử lại.\n");
