@@ -8,7 +8,7 @@
 #include "send_question_function.h"
 #include "server_function_login_logout.h"
 #include "server_function.h"
-
+#include "server.h"
 // Thêm khai báo hàm send_message
 void send_message(char *header, char *data, int connfd);
 
@@ -111,6 +111,14 @@ int process_join_room(char *room_id, int connfd, char *user_id)
     int currentNumbers = get_current_numbers(atoi(room_id)); // Hàm này cần được định nghĩa để lấy số lượng hiện tại
     update_room_status(atoi(room_id), status, currentNumbers + 1);
     insert_users_rooms_table(atoi(room_id), atoi(user_id));
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (clients_status[i].socket == connfd)
+        {
+            clients_status[i].room_id = atoi(room_id);
+            break;
+        }
+    }
 
     if (get_current_numbers(atoi(room_id)) == 3)
     {
@@ -172,7 +180,14 @@ void handle_leave_room_request(char *data, int connfd)
         delete_users_rooms_table(atoi(room_id), atoi(user_id));
         send_message("LEAVE_ROOM_RES", "0", connfd); // Phản hồi thành công
         printf("Người chơi đã thoát phòng. Số lượng người chơi hiện tại: %d\n", currentNumbers - 1);
-
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (clients_status[i].socket == connfd)
+            {
+                clients_status[i].room_id = 0;
+                break;
+            }
+        }
         // Nếu phòng không còn người chơi, cập nhật trạng thái phòng
         if (currentNumbers - 1 == 0)
         {
@@ -187,3 +202,4 @@ void handle_leave_room_request(char *data, int connfd)
     }
 }
 
+#endif // SERVER_FUNCTION_ROOM_H

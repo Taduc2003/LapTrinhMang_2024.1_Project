@@ -1,5 +1,5 @@
-#ifndef CLIENT_FUNCTION_GAME_H
-#define CLIENT_FUNCTION_GAME_H
+#ifndef CLIENT_FUNCTION_GAME_2_H
+#define CLIENT_FUNCTION_GAME_2_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <sys/socket.h>
 #include <unistd.h> // Add this for STDIN_FILENO
+#include "client_function.h"
 
 #define MAXLINE 4096
 #define INITIAL_MONEY 1000000
@@ -14,14 +15,20 @@
 void handle_join_game(int sockfd, char *user_id, char *room_id);
 void handle_in_game(int sockfd, char *user_id, char *room_id);
 void handle_send_answer(int sockfd, int current_money, int question_id);
-void handle_question(int sockfd, char *data);
+void handle_question(char *data, int sockfd);
+void clear_stdin()
+{
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF)
+        ;
+}
 
 void handle_join_game(int sockfd, char *user_id, char *room_id)
 {
     char data[MAXLINE];
     snprintf(data, MAXLINE, "%s %s", user_id, room_id);
     send_message("JOIN_GAME", data, sockfd);
-    int n;
+    // int n;
     char buffer[MAXLINE];
 
     // Vòng lặp đợi phản hồi từ server
@@ -34,12 +41,13 @@ void handle_join_game(int sockfd, char *user_id, char *room_id)
             exit(4);
         }
 
-        process_message(buffer, strlen(buffer), sockfd); // Kết thúc chuỗi
-        char *data_start = strstr(buffer, "DATA: ");
-        if (strncmp(data_start, "1", 1) == 0)
+        process_message(buffer, strlen(buffer)); // Kết thúc chuỗi
+        if (strstr(buffer, "HEADER: GAME_START") != NULL)
         {
             break;
-        }else{
+        }
+        else
+        {
             printf("Đang chờ người chơi khác tham gia...\n");
         }
     }
@@ -62,30 +70,40 @@ void handle_in_game(int sockfd, char *user_id, char *room_id)
             printf("Mất kết nối với server.\n");
             break;
         }
-        //buffer[n] = '\0';
-        process_message(buffer, strlen(buffer), sockfd);
-        if (strncmp(data_start, "1", 1) == 0)
+        buffer[n] = '\0';
+        process_message_in_game(buffer, strlen(buffer), sockfd);
+        if (strstr(buffer, "HEADER: WIN") != NULL || strstr(buffer, "HEADER: GAME_OVER") != NULL)
         {
             break;
         }
     }
 }
 
-void handle_question(int sockfd, char *data)
+void handle_question(char *data, int sockfd)
 {
-    char content[1024];
-    int current_money;
-    int question_id;
-    sscanf(data, "%d %d %s", &question_id, &current_money, content);
+    char *content;
+    char *current_money;
+    char *question_id;
+    current_money = strtok(data, "|");
+    if (current_money != NULL)
+    {
+        // Tách phần thứ hai (Câu hỏi)
+        question_id = strtok(NULL, "|");
+        if (question_id != NULL)
+        {
+            // Tách phần thứ ba (Các câu trả lời)
+            content = strtok(NULL, "|");
+        }
+    }
     printf("\n----------------------------------------\n");
     printf("|||             CÂU HỎI MỚI           |||\n");
     printf("----------------------------------------\n");
     printf("%s\n", content);
     printf("----------------------------------------\n");
-    printf("Số tiền hiện tại: %d\n", current_money);
+    printf("Số tiền hiện tại: %s\n", current_money);
     printf("----------------------------------------\n");
 
-    handle_send_answer(sockfd,current_money,question_id);
+    handle_send_answer(sockfd, atoi(current_money), atoi(question_id));
 }
 
 typedef struct
@@ -159,7 +177,6 @@ void handle_send_answer(int sockfd, int current_money, int question_id)
              bets[1].answer, bets[1].bet_amount);
 
     send_message("ANSWER", send_buffer, sockfd);
-    printf("\nĐã gửi câu trả lời: %s\n", send_buffer);
 
     free(bets);
 }

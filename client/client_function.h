@@ -16,8 +16,9 @@ void send_message(char *header, char *data, int sockfd);
 void process_message(char *msg, int n);
 void display_data(const char *data);
 void trim_whitespace(char *str);
+void process_message_in_game(char *msg, int n, int sockfd);
 
-void process_message(char *msg, int n, int sockfd)
+void process_message(char *msg, int n)
 {
     msg[n] = '\0';                                       // Đảm bảo thông điệp là chuỗi null-terminated
     printf("Processing message from server: %s\n", msg); // Có thể giữ lại dòng này cho debug
@@ -134,12 +135,10 @@ void process_message(char *msg, int n, int sockfd)
 
     if (strcmp(header, "LOGOUT_RES") == 0)
     {
-        printf("Đăng xuất thành công.\n");
+        printf("%s\n", data);
+        return;
     }
-    else
-    {
-        printf("Đăng xuất thất bại. Vui lòng thử lại.\n");
-    }
+
     if (strcmp(header, "WAITING_FOR_PLAYERS") == 0)
     {
         printf("Đang chờ người chơi khác tham gia...\n");
@@ -149,24 +148,6 @@ void process_message(char *msg, int n, int sockfd)
     if (strcmp(header, "GAME_START") == 0)
     {
         printf("Game đã bắt đầu!\n");
-        return;
-    }
-
-    if (strcmp(header, "QUESTION") == 0)
-    {
-        handle_question(sockfd, data);
-        return;
-    }
-
-    if (strcmp(header, "ANSWER_RESULT") == 0)
-    {
-        printf("%s\n", data);
-        return;
-    }
-
-    if (strcmp(header, "OVER_MONEY") == 0)
-    {
-        printf("%s\n", data);
         return;
     }
 
@@ -226,4 +207,89 @@ void trim_whitespace(char *str)
 
     *(end + 1) = '\0'; // Kết thúc chuỗi tại vị trí cuối cùng của nó
 }
+
+void process_message_in_game(char *msg, int n, int sockfd)
+{
+    msg[n] = '\0';                                       // Đảm bảo thông điệp là chuỗi null-terminated
+    printf("Processing message from server: %s\n", msg); // Có thể giữ lại dòng này cho debug
+
+    char header[MAXLINE];
+    char data[MAXLINE];
+
+    // Phân tách HEADER và DATA từ thông điệp
+    char *header_start = strstr(msg, "HEADER: ");
+    char *data_start = strstr(msg, "DATA: ");
+
+    if (header_start && data_start)
+    {
+        header_start += 8; // Bỏ qua "HEADER: "
+        char *header_end = strstr(header_start, ";");
+        if (header_end)
+        {
+            strncpy(header, header_start, header_end - header_start);
+            header[header_end - header_start] = '\0'; // Kết thúc chuỗi
+        }
+        else
+        {
+            fprintf(stderr, "Invalid message format: HEADER end not found\n");
+            return;
+        }
+
+        // Lấy DATA
+        data_start += 6; // Bỏ qua "DATA: "
+        strncpy(data, data_start, MAXLINE - 1);
+        data[MAXLINE - 1] = '\0'; // Kết thúc chuỗi
+    }
+    else
+    {
+        fprintf(stderr, "Invalid message format\n");
+        return;
+    }
+
+    // In thông báo từ server
+    printf("---------------------\n");
+    printf("HEADER: %s\n", header);
+    printf("DATA: %s\n", data);
+    printf("---------------------\n");
+
+    if (strcmp(header, "QUESTION") == 0)
+    {
+        handle_question(data, sockfd);
+        return;
+    }
+
+    if (strcmp(header, "ANSWER_RESULT") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    if (strcmp(header, "OVER_MONEY") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    if (strcmp(header, "GAME_OVER") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    if (strcmp(header, "WIN") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    if (strcmp(header, "RANKING") == 0)
+    {
+        printf("%s\n", data);
+        return;
+    }
+
+    printf("Phản hồi không xác định từ server. khi xu li game%s\n", msg);
+    // Xử lý các phản hồi khác nếu cần
+}
+
 #endif // CLIENT_FUNCTION_H

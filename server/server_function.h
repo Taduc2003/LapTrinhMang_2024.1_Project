@@ -35,8 +35,8 @@ void process_message(char *msg, int n, int connfd)
     char header[MAXLINE] = {0};
     char data[MAXLINE] = {0};
 
-    static int game_requests = 0; // số lượng yêu cầu vào game
-    static Player *player[3];     // Mảng chứa các kết nối của người chơi
+    // static int game_requests = 0; // số lượng yêu cầu vào game
+    // static Player *player[3];     // Mảng chứa các kết nối của người chơi
 
     // Tách HEADER và DATA
     char *header_start = strstr(msg, "HEADER: ");
@@ -157,7 +157,7 @@ void process_message(char *msg, int n, int connfd)
     }
     else if (strcmp(header, "ANSWER") == 0)
     {
-        handle_answer_request(data, connfd);
+        handle_answer_of_client(data, connfd);
     }
 
     else
