@@ -433,11 +433,15 @@ void handle_send_question(int room_id)
                         {
                             perror("recv error");
                             handle_client_disconnect(clients_status[i].socket);
-                            continue;
+                            active_players--;
+                            return;
                         }
-                        buffer[valread] = '\0';
-                        process_message(buffer, strlen(buffer), clients_status[i].socket);
-                        player_answered_num++;
+                        if (valread > 0)
+                        {
+                            buffer[valread] = '\0';
+                            process_message(buffer, strlen(buffer), clients_status[i].socket);
+                            player_answered_num++;
+                        }
                     }
                 }
             }
