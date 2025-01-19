@@ -69,6 +69,7 @@ void create_questions_table();
 int insert_questions_table(char *content, char *ans1, char *ans2, char *ans3, int correctAns, int level);
 void insert_sample_questions();
 Question *search_questions_by_level(int level);
+Question *search_question_by_id(int id);
 
 void create_rooms_table();
 int insert_rooms_table(int numbers);
@@ -81,6 +82,8 @@ void create_ranking_round_table();
 int insert_ranking_round_table(int roomId, int userId, int round, int money);
 Ranking *search_rankings_by_roomId_round(int roomId, int round);
 int get_current_money(int roomId, int userId, int round);
+int get_ready_user_number(int roomId, int round);
+char *get_username_in_ranking_round(int roomId, int userId, int round);
 
 int insert_users_rooms_table(int userId, int roomId);
 int delete_users_rooms_table(int userId, int roomId);
@@ -95,7 +98,7 @@ void create_users_table()
         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
         "username TEXT NOT NULL,"
         "password TEXT NOT NULL,"
-        "status INTEGER  DEFAULT 1" // Mac dinh la 1
+        "status INTEGER  DEFAULT 0" // Mac dinh la 0
         ");";
 
     if (sqlite3_exec(db, create_table_query, 0, 0, 0) != SQLITE_OK)
@@ -1206,19 +1209,24 @@ void update_user_status(const char *username, int status)
     close_database();
 }
 
-int get_user_status(const char *username) {
+int get_user_status(const char *username)
+{
     open_database();
     const char *select_query = "SELECT status FROM users WHERE username = ?;";
     sqlite3_stmt *stmt;
     int status = 0;
 
-    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
         sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
 
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
             status = sqlite3_column_int(stmt, 0);
         }
-    } else {
+    }
+    else
+    {
         fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
     }
 
@@ -1227,30 +1235,38 @@ int get_user_status(const char *username) {
     return status;
 }
 
-char *get_username_from_database(const int userid) {
+char *get_username_from_database(const int userid)
+{
     open_database();
     const char *select_query = "SELECT username FROM users WHERE id = ?;";
     sqlite3_stmt *stmt;
     char *username = malloc(128); // Allocate memory for username
 
-    if (!username) {
+    if (!username)
+    {
         fprintf(stderr, "Error: Memory allocation failed\n");
         close_database();
         return NULL;
     }
 
-    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK) {
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
         sqlite3_bind_int(stmt, 1, userid); // Use bind_int for integer parameter
 
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
             const char *temp = (const char *)sqlite3_column_text(stmt, 0);
             strncpy(username, temp, 127);
             username[127] = '\0'; // Ensure null termination
-        } else {
+        }
+        else
+        {
             free(username);
             username = NULL;
         }
-    } else {
+    }
+    else
+    {
         fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
         free(username);
         username = NULL;
@@ -1259,4 +1275,145 @@ char *get_username_from_database(const int userid) {
     sqlite3_finalize(stmt);
     close_database();
     return username;
+}
+
+int get_ready_user_number(int roomId, int round)
+{
+    open_database();
+    const char *select_query = "SELECT COUNT(*) FROM ranking_round WHERE roomId = ? AND round = ?;";
+    sqlite3_stmt *stmt;
+    int count = 0;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, roomId);
+        sqlite3_bind_int(stmt, 2, round);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            count = sqlite3_column_int(stmt, 0);
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    close_database();
+    return count;
+}
+
+Question *search_question_by_id(int id)
+{
+    open_database();
+    const char *select_query = "SELECT id, content, ans1, ans2, ans3, correctAns, level FROM questions WHERE id = ?;";
+    sqlite3_stmt *stmt;
+    Question *question = malloc(sizeof(Question));
+    if (!question)
+    {
+        fprintf(stderr, "Error: Memory allocation failed.\n");
+        return NULL;
+    }
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_int(stmt, 1, id);
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            question->id = sqlite3_column_int(stmt, 0);
+            strncpy(question->content, (const char *)sqlite3_column_text(stmt, 1), sizeof(question->content) - 1);
+            strncpy(question->ans1, (const char *)sqlite3_column_text(stmt, 2), sizeof(question->ans1) - 1);
+            strncpy(question->ans2, (const char *)sqlite3_column_text(stmt, 3), sizeof(question->ans2) - 1);
+            strncpy(question->ans3, (const char *)sqlite3_column_text(stmt, 4), sizeof(question->ans3) - 1);
+            question->correctAns = sqlite3_column_int(stmt, 5);
+            question->level = sqlite3_column_int(stmt, 6);
+        }
+        sqlite3_finalize(stmt);
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        free(question);
+        question = NULL;
+    }
+
+    close_database();
+    return question;
+}
+
+char *get_username_in_ranking_round(int roomId, int userId, int round)
+{
+    open_database();
+
+    const char *select_query = "SELECT u.username FROM users u "
+                               "JOIN ranking_round r ON u.id = r.userId "
+                               "WHERE r.roomId = ? AND r.userId = ? AND r.round = ?;";
+    sqlite3_stmt *stmt = NULL;
+    char *username = NULL;
+
+    // Chuẩn bị câu lệnh SQL
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) != SQLITE_OK)
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+        close_database();
+        return NULL;
+    }
+
+    // Bind các tham số
+    sqlite3_bind_int(stmt, 1, roomId);
+    sqlite3_bind_int(stmt, 2, userId);
+    sqlite3_bind_int(stmt, 3, round);
+
+    // Thực thi câu lệnh và lấy kết quả
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        const unsigned char *result = sqlite3_column_text(stmt, 0);
+        if (result)
+        {
+            username = malloc(strlen((const char *)result) + 1);
+            if (username)
+            {
+                strcpy(username, (const char *)result);
+            }
+            else
+            {
+                fprintf(stderr, "Error: Memory allocation failed\n");
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "No username found for roomId=%d, userId=%d, round=%d\n", roomId, userId, round);
+    }
+
+    // Giải phóng tài nguyên
+    sqlite3_finalize(stmt);
+    close_database();
+
+    return username; // Trả về NULL nếu không tìm thấy hoặc lỗi
+}
+
+int get_id_by_username(char *username)
+{
+    open_database();
+    const char *select_query = "SELECT id FROM users WHERE username = ?;";
+    sqlite3_stmt *stmt;
+    int id = 0;
+
+    if (sqlite3_prepare_v2(db, select_query, -1, &stmt, 0) == SQLITE_OK)
+    {
+        sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+        {
+            id = sqlite3_column_int(stmt, 0);
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error: Can't prepare statement: %s\n", sqlite3_errmsg(db));
+    }
+
+    sqlite3_finalize(stmt);
+    close_database();
+    return id;
 }

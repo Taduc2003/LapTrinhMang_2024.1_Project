@@ -8,6 +8,8 @@
         "xiosbase": "cpp",
         "xlocale": "cpp",
         "xutility": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "utility": "cpp",
+        "system_error": "cpp"
     }
 }

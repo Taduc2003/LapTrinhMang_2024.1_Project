@@ -37,6 +37,7 @@ int main(int argc, char **argv)
     // Register signal handlers
     signal(SIGINT, handle_server_shutdown);  // Ctrl+C
     signal(SIGTERM, handle_server_shutdown); // Terminate signal
+    signal(SIGPIPE, SIG_IGN);                // Ignore SIGPIPE to prevent server shutdown on client disconnect
 
     // Initialize client status
     for (int i = 0; i < MAX_CLIENTS; i++)
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
         clients_status[i].socket = 0;
         clients_status[i].is_logged_in = 0;
         clients_status[i].username[0] = '\0';
+        clients_status[i].room_id = 0;
     }
 
     // Open and initialize the database
@@ -194,6 +196,7 @@ void handle_client_disconnect(int sd)
             clients_status[i].socket = 0;
             clients_status[i].is_logged_in = 0;
             clients_status[i].username[0] = '\0';
+            clients_status[i].room_id = 0; 
             break;
         }
     }

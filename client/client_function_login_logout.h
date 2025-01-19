@@ -73,26 +73,28 @@ void login_user(int sockfd)
     while (1) // Vòng lặp đăng nhập
     {
         users sender_acc;
-        char header[MAXLINE], data[MAXLINE], recvline[MAXLINE];
+        char header[MAXLINE], data[MAXLINE], recv_buffer[MAXLINE];
 
         sender_acc = display_login_menu(); // Hiển thị màn hình nhập thông tin đăng nhập
         sprintf(header, "LOGIN_REQ");
         sprintf(data, "username: %s; password: %s", sender_acc.username, sender_acc.password);
         send_message(header, data, sockfd); // Gửi thông điệp đăng nhập đến server
 
-        if (recv(sockfd, recvline, MAXLINE, 0) == 0) // Kiểm tra phản hồi từ server
+        memset(recv_buffer, 0, MAXLINE);
+        if (recv(sockfd, recv_buffer, MAXLINE, 0) == 0) // Kiểm tra phản hồi từ server
         {
             printf("Máy chủ đã kết thúc sớm, không có phản hồi.\n");
             exit(4);
         }
-
-        process_message(recvline, strlen(recvline));
+        printf("recvline: %s\n", recv_buffer);
+        process_message(recv_buffer, strlen(recv_buffer));
         // Sau khi nhận thông điệp từ server, loại bỏ khoảng trắng và ký tự xuống dòng thừa
+       
         // Trước tiên, loại bỏ khoảng trắng hoặc ký tự không cần thit
-        trim_whitespace(recvline);
+        trim_whitespace(recv_buffer);
 
         // Sau đó, kiểm tra phần "DATA" trong thông điệp của server
-        char *data_start = strstr(recvline, "DATA: ");
+        char *data_start = strstr(recv_buffer, "DATA: ");
         if (data_start != NULL)
         {
             data_start += 6; // Bỏ qua "DATA: " để chỉ lấy phần giá trị thực tế
@@ -155,7 +157,7 @@ void menu_user(int sockfd)
         case 4:
             printf("Logging out...\n");
             char logout_request[MAXLINE];
-            sprintf(logout_request, "user_id: %s", user_id);
+            snprintf(logout_request, sizeof(logout_request), "user_id: %s", user_id);
             send_message("LOGOUT_REQ", logout_request, sockfd);
             char logout_response[MAXLINE];
             int n = recv(sockfd, logout_response, MAXLINE, 0);

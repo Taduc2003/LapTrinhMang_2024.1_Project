@@ -89,17 +89,19 @@ int main()
 
     // Nếu chưa có data hãy chạy này
     //---------------------------------------
-    // create_users_table();
-    // create_questions_table();
-    // create_rooms_table();
-    // create_ranking_round_table();
+    create_users_table();
+    create_questions_table();
+    create_rooms_table();
+    create_ranking_round_table();
+    create_users_rooms_table();
 
-    // insert_users_table("user1@", "U1#");
-    // insert_users_table("user2@", "U2#");
-    // insert_users_table("user3@", "U3#");
-    // insert_sample_questions(); // Thêm câu hỏi
+    insert_users_table("user1@", "U1#");
+    insert_users_table("user2@", "U2#");
+    insert_users_table("user3@", "U3#");
+    insert_sample_questions(); // Thêm câu hỏi
     //---------------------------------------
     // test_get_players_in_room();
-    // get_all_user_table();
+    get_all_user_table();
+    printf("%d",strcmp("user1@", get_username_in_ranking_round(1, 1, 0)));
     return 0;
 }
